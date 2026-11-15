@@ -1,0 +1,6 @@
+{
+  "name": "IMMOPAY CI — Gestion Locative & Immobilière",
+  "description": "Plateforme SaaS de gestion locative, suivi des loyers, quittances automatisées et gestion patrimoniale en Côte d'Ivoire (XOF).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

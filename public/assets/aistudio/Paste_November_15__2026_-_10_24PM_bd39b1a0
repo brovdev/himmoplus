@@ -1,0 +1,1314 @@
+# PROMPT MASTER – CONCEPTION ET DÉVELOPPEMENT COMPLET D'IMMOPAY CI
+
+## 1. TON RÔLE ET TA MISSION
+
+Agis comme une équipe professionnelle réunissant les compétences suivantes :
+
+- Architecte logiciel SaaS senior.
+- Développeur Full Stack expert Laravel, Vue.js et TypeScript.
+- Directeur artistique spécialisé dans les interfaces SaaS premium.
+- Designer UI/UX spécialisé dans les applications financières et immobilières.
+- Expert en gestion immobilière.
+- Expert en cybersécurité.
+- Expert en bases de données.
+- Expert en expérience utilisateur mobile.
+- Expert en monétisation et commercialisation SaaS.
+
+Ta mission est de concevoir et développer une plateforme SaaS complète appelée **IMMOPAY CI**.
+
+Tu ne dois pas créer une simple maquette ou un prototype visuel sans fonctionnalités.
+
+Tu dois construire une véritable application professionnelle, fonctionnelle, moderne, sécurisée et commercialisable en Côte d'Ivoire.
+
+L'application doit permettre aux propriétaires immobiliers, agences immobilières et gestionnaires de biens de gérer leurs activités immobilières depuis une seule plateforme.
+
+L'objectif est de créer un produit comparable, en qualité visuelle et en expérience utilisateur, aux meilleurs logiciels SaaS internationaux.
+
+Le résultat doit être particulièrement soigné sur le plan visuel.
+
+---
+
+# 2. IDENTITÉ DE LA MARQUE
+
+**Nom :** IMMOPAY CI
+
+**Slogan :** « Votre immobilier, votre tranquillité. »
+
+**Marché de lancement :** Côte d'Ivoire.
+
+**Langue principale :** Français.
+
+**Devise :** Franc CFA (XOF).
+
+**Public cible :**
+- Propriétaires immobiliers.
+- Agences immobilières.
+- Gestionnaires de biens.
+- Promoteurs immobiliers.
+- Administrateurs de résidences.
+- Gestionnaires de plusieurs immeubles.
+
+L'interface doit être compréhensible par un utilisateur qui n'a pas nécessairement de connaissances informatiques.
+
+---
+
+# 3. DIRECTION ARTISTIQUE – PRIORITÉ ABSOLUE
+
+Je veux une identité visuelle exceptionnelle.
+
+Ne produis pas une interface générique ressemblant à un ancien tableau de bord administratif.
+
+Je veux une application élégante, moderne, premium, professionnelle et visuellement impressionnante.
+
+## 3.1 Charte graphique
+
+Utilise les couleurs suivantes :
+
+- Vert forêt profond : #123C32
+- Vert principal : #185C46
+- Vert secondaire : #247A5B
+- Or élégant : #D6AE55
+- Or clair : #F0D99A
+- Blanc : #FFFFFF
+- Fond général : #F6F8F7
+- Gris clair : #E8EEEB
+- Gris texte : #66736D
+- Rouge alerte : #D94B4B
+- Orange avertissement : #E9A23B
+
+Le vert forêt doit représenter la confiance, la stabilité et la sécurité.
+
+L'or doit donner une impression de prestige et de qualité.
+
+Le rouge doit être réservé aux retards de paiement, erreurs et situations urgentes.
+
+Ne transforme pas toute l'interface en vert. Utilise les couleurs avec équilibre.
+
+## 3.2 Style visuel
+
+Créer une interface inspirée des meilleurs produits SaaS modernes :
+
+- Design premium.
+- Minimalisme élégant.
+- Espaces bien équilibrés.
+- Cartes modernes avec coins arrondis.
+- Ombres très légères.
+- Typographie professionnelle.
+- Icônes cohérentes.
+- Graphiques élégants.
+- Tableaux parfaitement alignés.
+- Boutons modernes.
+- Formulaires agréables à utiliser.
+- Animations discrètes et fluides.
+- Transitions naturelles entre les pages.
+
+Utiliser une typographie moderne comme Inter ou une police équivalente.
+
+Les titres doivent être bien hiérarchisés.
+
+Les textes doivent être lisibles et les informations importantes immédiatement visibles.
+
+Éviter les interfaces surchargées, les couleurs criardes, les dégradés excessifs et les effets décoratifs inutiles.
+
+## 3.3 Logo
+
+Créer un logo professionnel IMMOPAY CI.
+
+Concept souhaité :
+- Un symbole architectural représentant un immeuble ou une maison.
+- Un élément graphique évoquant le paiement ou la gestion financière.
+- Une typographie élégante.
+- Une déclinaison sur fond clair et fond sombre.
+
+Le logo doit être simple, reconnaissable et utilisable sur le site web, l'application, les factures et les reçus.
+
+## 3.4 Expérience visuelle attendue
+
+Je veux que lorsqu'un utilisateur ouvre IMMOPAY CI, il découvre immédiatement :
+
+- Une interface soignée.
+- Un tableau de bord professionnel.
+- Des indicateurs financiers bien présentés.
+- Des graphiques modernes.
+- Des informations faciles à comprendre.
+- Une navigation simple.
+- Des actions importantes accessibles rapidement.
+
+Ne te contente pas de mettre des cartes les unes à côté des autres. Compose une véritable expérience visuelle.
+
+---
+
+# 4. CONCEPTION DES INTERFACES
+
+Avant de développer les fonctionnalités, définis un système de design cohérent.
+
+Crée les composants réutilisables suivants :
+
+- Logo et variantes.
+- Sidebar.
+- Barre supérieure.
+- Menus déroulants.
+- Cartes statistiques.
+- Boutons primaires et secondaires.
+- Champs de formulaire.
+- Sélecteurs de dates.
+- Badges de statut.
+- Tableaux.
+- Graphiques.
+- Fenêtres modales.
+- Notifications.
+- Alertes.
+- Menus contextuels.
+- Pagination.
+- États de chargement.
+- États vides.
+- Messages de confirmation.
+- Messages d'erreur.
+
+Chaque composant doit respecter la charte graphique.
+
+## 4.1 Interface principale de l'administrateur client
+
+Créer une navigation latérale moderne avec :
+
+- Logo IMMOPAY CI.
+- Tableau de bord.
+- Biens immobiliers.
+- Immeubles.
+- Logements.
+- Locataires.
+- Contrats.
+- Loyers.
+- Paiements.
+- Reçus.
+- Dépenses.
+- Maintenance.
+- Rapports.
+- Utilisateurs.
+- Abonnement.
+- Paramètres.
+
+En bas de la navigation, afficher le profil de l'utilisateur connecté.
+
+La barre supérieure doit contenir :
+
+- Titre de la page.
+- Fil d'Ariane lorsque nécessaire.
+- Recherche globale.
+- Notifications.
+- Sélecteur d'organisation si l'utilisateur appartient à plusieurs organisations.
+- Menu de profil.
+
+La sidebar doit pouvoir se réduire sur ordinateur et devenir un menu mobile sur smartphone.
+
+## 4.2 Tableau de bord premium
+
+Créer un tableau de bord visuellement remarquable.
+
+En haut, afficher :
+
+« Bonjour, [Prénom] »
+
+« Voici la situation de votre patrimoine immobilier. »
+
+Ajouter un sélecteur de période.
+
+Créer les cartes statistiques suivantes :
+
+1. Total des biens.
+2. Logements occupés.
+3. Logements disponibles.
+4. Locataires actifs.
+5. Loyers attendus.
+6. Loyers encaissés.
+7. Loyers impayés.
+8. Dépenses du mois.
+
+Chaque carte doit présenter :
+- Une icône.
+- Une valeur principale.
+- Un libellé.
+- Une comparaison avec la période précédente lorsque les données le permettent.
+- Une indication visuelle discrète.
+
+Créer une section financière avec :
+
+- Graphique des loyers encaissés.
+- Graphique des loyers attendus.
+- Évolution mensuelle des revenus.
+- Répartition des biens selon leur occupation.
+
+Créer une section « Paiements récents ».
+
+Créer une section « Loyers en retard ».
+
+Créer une section « Échéances à venir ».
+
+Créer une section « Activités récentes ».
+
+Créer une section « Alertes importantes ».
+
+Utiliser des graphiques interactifs, avec infobulles, légendes et périodes sélectionnables.
+
+Les statistiques doivent provenir de la base de données et non de valeurs inventées.
+
+Prévoir un état vide élégant lorsqu'un compte vient d'être créé et ne possède pas encore de données.
+
+## 4.3 Page de gestion des biens
+
+Créer une page avec une présentation visuelle professionnelle.
+
+Afficher les biens sous forme de cartes ou de tableau selon le choix de l'utilisateur.
+
+Chaque carte peut afficher :
+- Photo du bien.
+- Nom.
+- Type.
+- Adresse.
+- Nombre de logements.
+- Statut.
+- Montant des loyers.
+- Actions rapides.
+
+Ajouter :
+- Recherche.
+- Filtres.
+- Tri.
+- Pagination.
+- Bouton « Ajouter un bien ».
+
+Le formulaire de création doit être organisé en sections claires.
+
+Prévoir l'ajout de photos avec aperçu avant enregistrement.
+
+## 4.4 Page des locataires
+
+Créer un tableau moderne comprenant :
+
+- Photo ou avatar.
+- Nom complet.
+- Téléphone.
+- Bien occupé.
+- Loyer mensuel.
+- Prochaine échéance.
+- Situation financière.
+- Statut.
+
+Créer une fiche locataire détaillée avec onglets :
+
+- Informations.
+- Contrat.
+- Paiements.
+- Reçus.
+- Réclamations.
+- Documents.
+- Historique.
+
+## 4.5 Page des paiements
+
+Créer une interface financière claire.
+
+Afficher :
+- Total encaissé.
+- Paiements en attente.
+- Paiements partiels.
+- Paiements en retard.
+- Historique des transactions.
+
+Chaque paiement doit présenter :
+- Référence.
+- Locataire.
+- Bien.
+- Période.
+- Montant.
+- Mode de paiement.
+- Date.
+- Statut.
+
+Utiliser des badges visuels pour distinguer les statuts.
+
+## 4.6 Page des contrats
+
+Créer une interface permettant de visualiser :
+- Contrats actifs.
+- Contrats expirant prochainement.
+- Contrats expirés.
+- Contrats en attente.
+
+Permettre de consulter, créer, modifier, renouveler et télécharger un contrat.
+
+## 4.7 Page des rapports
+
+Créer des graphiques professionnels et des tableaux financiers.
+
+Prévoir des filtres par :
+- Date.
+- Immeuble.
+- Logement.
+- Locataire.
+- Type de rapport.
+
+Créer des boutons d'export PDF, Excel et CSV.
+
+## 4.8 Responsive design
+
+L'application doit être parfaitement adaptée à :
+
+- Ordinateur.
+- Tablette.
+- Smartphone Android.
+- iPhone.
+
+Sur mobile :
+- Menu simplifié.
+- Navigation intuitive.
+- Cartes statistiques empilées.
+- Tableaux adaptés ou transformés en listes.
+- Boutons suffisamment grands.
+- Formulaires faciles à remplir.
+- Accès rapide aux paiements et reçus.
+
+Aucun élément ne doit provoquer de débordement horizontal sur les petits écrans.
+
+---
+
+# 5. ARCHITECTURE TECHNIQUE
+
+Utiliser prioritairement la stack suivante :
+
+## Backend
+- PHP.
+- Laravel.
+- API REST sécurisée.
+
+## Frontend
+- Vue 3.
+- TypeScript.
+- Inertia.js.
+- Tailwind CSS.
+
+## Base de données
+- MySQL.
+
+## Autres technologies
+- Redis pour les files d'attente et les tâches planifiées lorsque nécessaire.
+- Bibliothèque de graphiques moderne.
+- Génération PDF.
+- Stockage sécurisé des fichiers.
+- PWA installable.
+- Système de notifications.
+
+Utiliser des versions stables et compatibles des dépendances au moment du développement.
+
+Ne pas mélanger plusieurs frameworks frontend sans justification.
+
+Organiser le code pour qu'il soit facile à maintenir et à faire évoluer.
+
+---
+
+# 6. ARCHITECTURE MULTI-TENANT
+
+Créer une véritable plateforme SaaS multi-organisations.
+
+Chaque client possède son propre espace.
+
+Prévoir trois niveaux :
+
+1. Super administrateur IMMOPAY CI.
+2. Administrateur client : propriétaire ou agence.
+3. Utilisateurs secondaires : gestionnaires, comptables, agents.
+
+Prévoir également un portail indépendant pour les locataires.
+
+Chaque organisation possède ses propres :
+- Utilisateurs.
+- Biens.
+- Immeubles.
+- Logements.
+- Locataires.
+- Contrats.
+- Paiements.
+- Dépenses.
+- Paramètres.
+- Abonnements.
+
+Une organisation ne doit jamais accéder aux données d'une autre organisation.
+
+L'isolation doit être appliquée côté serveur, dans les requêtes, les politiques d'accès et les API.
+
+Ne jamais se fier uniquement aux filtres de l'interface.
+
+---
+
+# 7. TABLEAU DE BORD PRINCIPAL
+
+Créer un tableau de bord intelligent avec :
+
+- Nombre total de biens.
+- Logements disponibles.
+- Logements occupés.
+- Nombre total de locataires.
+- Contrats actifs.
+- Loyers attendus ce mois.
+- Loyers encaissés.
+- Loyers impayés.
+- Paiements en retard.
+- Dépenses immobilières.
+- Revenus nets estimés.
+
+Ajouter les graphiques :
+
+- Évolution des revenus mensuels.
+- Loyers encaissés contre loyers attendus.
+- Répartition des biens.
+- Évolution des impayés.
+- Revenus par immeuble.
+
+Ajouter :
+- Calendrier des échéances.
+- Dernières activités.
+- Alertes de retard.
+- Contrats à renouveler.
+- Logements bientôt disponibles.
+- Dépenses à valider.
+
+---
+
+# 8. GESTION DES BIENS IMMOBILIERS
+
+Permettre d'enregistrer :
+
+- Maisons.
+- Appartements.
+- Studios.
+- Villas.
+- Magasins.
+- Bureaux.
+- Entrepôts.
+- Terrains.
+
+Pour chaque bien :
+
+- Nom.
+- Référence unique.
+- Type.
+- Description.
+- Adresse.
+- Commune.
+- Ville.
+- Quartier.
+- Nombre de chambres.
+- Nombre de salles de bains.
+- Superficie.
+- Loyer mensuel.
+- Caution.
+- Avance.
+- Photos.
+- Documents.
+- État.
+- Statut.
+
+Statuts :
+- Disponible.
+- Occupé.
+- En maintenance.
+- Indisponible.
+
+Permettre de regrouper plusieurs logements dans un immeuble.
+
+Exemple :
+
+Résidence Angré :
+- Appartement A1.
+- Appartement A2.
+- Appartement A3.
+- Studio B1.
+- Studio B2.
+
+Chaque logement possède son historique de location.
+
+Ajouter une recherche multicritère et des filtres.
+
+---
+
+# 9. GESTION DES LOCATAIRES
+
+Créer une fiche complète pour chaque locataire.
+
+Informations :
+
+- Nom et prénoms.
+- Téléphone.
+- E-mail.
+- Adresse actuelle.
+- Profession.
+- Contact d'urgence.
+- Date d'entrée.
+- Bien occupé.
+- Référence du contrat.
+- Montant du loyer.
+- Date habituelle de paiement.
+- Caution versée.
+- Avance versée.
+- Statut.
+
+Prévoir :
+- Documents.
+- Historique des paiements.
+- Historique des retards.
+- Historique des contrats.
+- Historique des réclamations.
+- Historique des communications.
+
+Ajouter une synthèse financière du locataire.
+
+---
+
+# 10. GESTION DES CONTRATS
+
+Créer un système complet de gestion des contrats.
+
+Fonctionnalités :
+
+- Création.
+- Association à un bien.
+- Association à un locataire.
+- Date de début.
+- Date de fin.
+- Loyer.
+- Caution.
+- Avance.
+- Jour d'échéance.
+- Conditions particulières.
+- Documents.
+- Statut.
+
+Générer automatiquement des contrats PDF à partir de modèles personnalisables.
+
+Prévoir les alertes :
+- 90 jours avant expiration.
+- 60 jours avant expiration.
+- 30 jours avant expiration.
+- À la date d'expiration.
+
+Permettre le renouvellement d'un contrat en conservant son historique.
+
+Ne jamais présenter un modèle générique comme juridiquement validé en Côte d'Ivoire.
+
+---
+
+# 11. GESTION AUTOMATIQUE DES LOYERS
+
+Créer un système de génération des échéances.
+
+Chaque mois, les loyers doivent être générés à partir des contrats actifs.
+
+Fonctionnalités :
+
+- Génération automatique.
+- Dates d'échéance.
+- Paiement total.
+- Paiement partiel.
+- Avances.
+- Arriérés.
+- Pénalités configurables.
+- Remises.
+- Historique.
+
+Statuts :
+
+- En attente.
+- Payé.
+- Partiellement payé.
+- En retard.
+- Annulé.
+- Contesté.
+
+Éviter les doublons lors des traitements automatiques.
+
+Créer un système de rapprochement entre les loyers attendus et les montants encaissés.
+
+---
+
+# 12. PAIEMENTS MOBILE MONEY
+
+Prévoir l'intégration de :
+
+- Orange Money.
+- MTN Mobile Money.
+- Moov Money.
+- Wave.
+- Virement bancaire.
+- Espèces.
+- Chèque.
+
+Fonctionnalités :
+
+- Enregistrement des paiements.
+- Références de transaction.
+- Confirmation.
+- Historique.
+- Reçus.
+- Rapprochement.
+- Paiements partiels.
+
+Les paiements électroniques doivent utiliser des API officielles ou des prestataires agréés.
+
+Prévoir un environnement sandbox.
+
+Vérifier les notifications côté serveur, les signatures et les références de transaction.
+
+Ne jamais simuler une transaction réelle.
+
+Ne jamais valider un paiement uniquement sur la base d'une capture d'écran.
+
+Prévoir la validation manuelle pour les paiements hors ligne.
+
+---
+
+# 13. REÇUS AUTOMATIQUES
+
+Après confirmation d'un paiement, générer un reçu PDF professionnel.
+
+Le reçu doit comporter :
+
+- Logo IMMOPAY CI.
+- Nom du propriétaire ou de l'agence.
+- Nom du locataire.
+- Référence.
+- Adresse du bien.
+- Montant reçu.
+- Solde restant.
+- Période.
+- Date.
+- Mode de paiement.
+- Signature ou cachet configuré.
+
+Permettre :
+- Téléchargement.
+- Impression.
+- Partage WhatsApp.
+- Envoi e-mail.
+
+Ajouter un QR code de vérification.
+
+Toute correction ou annulation doit être traçable.
+
+---
+
+# 14. RAPPELS AUTOMATIQUES
+
+Créer des rappels configurables.
+
+Exemple :
+
+- J-5 : premier rappel.
+- J-2 : deuxième rappel.
+- J : notification d'échéance.
+- J+3 : retard.
+- J+7 : relance.
+- J+15 : alerte propriétaire.
+
+Canaux :
+
+- WhatsApp Business API.
+- SMS.
+- E-mail.
+- Notifications dans l'application.
+
+Créer des modèles personnalisables.
+
+Exemple :
+
+« Bonjour [Nom du locataire], nous vous rappelons que votre loyer de [Montant] FCFA arrive à échéance le [Date]. Merci de prendre vos dispositions. Cordialement, [Nom du propriétaire]. »
+
+Conserver l'historique et le statut d'envoi.
+
+Ne jamais déclarer un message envoyé sans confirmation du fournisseur.
+
+---
+
+# 15. GESTION DES DÉPENSES
+
+Catégories :
+
+- Réparations.
+- Plomberie.
+- Électricité.
+- Peinture.
+- Entretien.
+- Nettoyage.
+- Gardiennage.
+- Taxes et charges.
+- Rénovation.
+- Honoraires.
+- Autres.
+
+Pour chaque dépense :
+
+- Description.
+- Montant.
+- Date.
+- Bien.
+- Fournisseur.
+- Justificatif.
+- Statut de validation.
+
+Calculer :
+
+Revenus nets = Loyers encaissés - Dépenses enregistrées.
+
+Créer des tableaux de rentabilité par logement et immeuble.
+
+---
+
+# 16. MAINTENANCE ET RÉCLAMATIONS
+
+Permettre aux locataires de signaler :
+
+- Fuite d'eau.
+- Problème électrique.
+- Serrure défectueuse.
+- Toiture.
+- Dégradation.
+- Autre incident.
+
+Chaque réclamation contient :
+
+- Description.
+- Photos.
+- Date.
+- Bien.
+- Priorité.
+- Responsable.
+- Coût estimé.
+- Statut.
+
+Statuts :
+- Nouveau.
+- En cours.
+- En attente.
+- Résolu.
+- Annulé.
+
+---
+
+# 17. PORTAIL LOCATAIRE
+
+Créer un espace sécurisé et indépendant.
+
+Le locataire doit voir uniquement ses propres informations.
+
+Son tableau de bord affiche :
+
+- Logement.
+- Contrat.
+- Loyer mensuel.
+- Prochaine échéance.
+- Historique des paiements.
+- Impayés.
+- Reçus.
+- Réclamations.
+
+Fonctionnalités :
+
+- Télécharger les reçus.
+- Consulter le contrat.
+- Déclarer un problème.
+- Recevoir des notifications.
+- Payer en ligne lorsque disponible.
+- Télécharger son historique.
+
+---
+
+# 18. RAPPORTS ET ANALYSES
+
+Créer des rapports professionnels :
+
+- Revenus mensuels.
+- Revenus annuels.
+- Impayés.
+- Dépenses.
+- Rentabilité par logement.
+- Rentabilité par immeuble.
+- Taux d'occupation.
+- Historique des paiements.
+- Situation financière des locataires.
+
+Filtres par période, immeuble, logement et locataire.
+
+Exports :
+- PDF.
+- Excel.
+- CSV.
+
+---
+
+# 19. SUPER ADMINISTRATEUR IMMOPAY CI
+
+Créer un espace distinct réservé à l'équipe IMMOPAY CI.
+
+Fonctionnalités :
+
+- Gestion des comptes clients.
+- Création et suspension des comptes.
+- Gestion des abonnements.
+- Gestion des offres.
+- Paiements d'abonnement.
+- Gestion des utilisateurs.
+- Statistiques globales.
+- Support.
+- Paramètres généraux.
+- Journaux d'activité.
+- Notifications globales.
+
+Statistiques :
+
+- Nombre de clients.
+- Nombre de propriétaires.
+- Nombre d'agences.
+- Nombre de biens.
+- Nombre de locataires.
+- Contrats actifs.
+- Abonnements actifs.
+- Abonnements expirés.
+- Chiffre d'affaires mensuel.
+- Taux de conversion.
+
+Toutes les actions sensibles doivent être journalisées.
+
+Limiter strictement l'accès du super administrateur aux informations personnelles des locataires.
+
+Créer une interface visuellement distincte, mais cohérente avec l'identité IMMOPAY CI.
+
+---
+
+# 20. ABONNEMENTS SAAS
+
+Créer les plans suivants :
+
+## STARTER – 5 000 FCFA/mois
+
+- 5 biens maximum.
+- 10 locataires maximum.
+- Gestion des loyers.
+- Paiements.
+- Reçus.
+- Tableau de bord.
+- Support standard.
+
+## PRO – 15 000 FCFA/mois
+
+- 30 biens maximum.
+- 100 locataires maximum.
+- Toutes les fonctions Starter.
+- Contrats.
+- Rappels automatiques.
+- Dépenses.
+- Rapports PDF et Excel.
+- Réclamations.
+
+## BUSINESS – 35 000 FCFA/mois
+
+- 150 biens maximum.
+- 500 locataires maximum.
+- Toutes les fonctions Pro.
+- Multi-utilisateurs.
+- Gestion avancée des immeubles.
+- Automatisations avancées.
+- Analyses financières.
+- Support prioritaire.
+
+## ENTREPRISE – Sur devis
+
+- Biens illimités selon contrat.
+- Utilisateurs personnalisés.
+- Multi-agences.
+- Paramétrage spécifique.
+- Accompagnement dédié.
+
+Prévoir :
+- Abonnement mensuel.
+- Abonnement annuel avec réduction configurable.
+- Essai gratuit de 14 jours.
+- Factures.
+- Historique des transactions.
+- Renouvellement automatique uniquement avec consentement.
+- Notifications d'expiration.
+- Suspension progressive.
+
+Les limites doivent être contrôlées côté serveur.
+
+Créer une page de comparaison des offres très élégante.
+
+---
+
+# 21. SITE WEB PUBLIC
+
+Créer un site vitrine premium pour commercialiser IMMOPAY CI.
+
+Pages :
+
+1. Accueil.
+2. Fonctionnalités.
+3. Tarifs.
+4. Pour les propriétaires.
+5. Pour les agences.
+6. Démonstration.
+7. FAQ.
+8. Contact.
+9. Connexion.
+10. Inscription.
+
+## Page d'accueil
+
+Titre :
+
+« Gérez vos loyers sans stress. »
+
+Sous-titre :
+
+« IMMOPAY CI simplifie la gestion de vos biens immobiliers, automatise les rappels de loyers et vous permet de suivre vos revenus en temps réel. »
+
+Boutons :
+
+- Commencer gratuitement.
+- Découvrir la démonstration.
+
+Créer une page d'accueil visuellement impressionnante.
+
+Je veux :
+- Une grande section Hero.
+- Une illustration ou capture réaliste du tableau de bord.
+- Une présentation claire des avantages.
+- Des sections de fonctionnalités avec icônes.
+- Une démonstration visuelle de l'application.
+- Une section de tarifs.
+- Une FAQ.
+- Un appel à l'action final.
+- Un pied de page professionnel.
+
+Ne pas utiliser de faux témoignages présentés comme réels.
+
+Prévoir un formulaire de demande de démonstration.
+
+Le site doit être responsive et optimisé pour le référencement naturel.
+
+---
+
+# 22. AUTHENTIFICATION ET SÉCURITÉ
+
+Fonctionnalités :
+
+- Inscription.
+- Connexion.
+- Déconnexion.
+- Mot de passe oublié.
+- Réinitialisation.
+- Vérification e-mail.
+- Vérification téléphone si disponible.
+- Gestion des sessions.
+- Rôles et permissions.
+
+Sécurité :
+
+- Protection SQL Injection.
+- Protection XSS.
+- Protection CSRF.
+- Limitation des tentatives de connexion.
+- HTTPS.
+- Hachage sécurisé des mots de passe.
+- Contrôle d'accès côté serveur.
+- Isolation multi-tenant.
+- Validation des fichiers.
+- Sauvegardes.
+- Journaux d'activité.
+
+Prévoir les conditions générales et la politique de confidentialité adaptées au droit applicable en Côte d'Ivoire.
+
+---
+
+# 23. BASE DE DONNÉES
+
+Créer une base relationnelle MySQL structurée.
+
+Tables minimales :
+
+- users
+- organizations
+- organization_users
+- roles
+- permissions
+- subscriptions
+- subscription_plans
+- properties
+- buildings
+- units
+- tenants
+- rental_contracts
+- rent_invoices
+- rent_payments
+- payment_transactions
+- payment_methods
+- receipts
+- expenses
+- expense_categories
+- maintenance_requests
+- maintenance_interventions
+- notifications
+- notification_templates
+- documents
+- activity_logs
+- support_tickets
+- settings
+
+Ajouter les clés étrangères, index, contraintes d'intégrité, dates de création et modification et suppressions logiques lorsque nécessaires.
+
+Toutes les données métier doivent être correctement rattachées à une organisation.
+
+Utiliser des transactions de base de données pour les opérations financières sensibles.
+
+---
+
+# 24. EXPÉRIENCE MOBILE ET PWA
+
+Créer une PWA installable.
+
+L'expérience mobile doit être particulièrement soignée.
+
+Prévoir :
+- Navigation mobile.
+- Tableau de bord adapté.
+- Cartes lisibles.
+- Formulaires courts.
+- Notifications.
+- Paiements.
+- Reçus téléchargeables.
+- Portail locataire.
+
+Gérer les connexions instables.
+
+Une opération financière ne doit être considérée comme enregistrée qu'après confirmation du serveur.
+
+---
+
+# 25. DONNÉES DE DÉMONSTRATION
+
+Créer un environnement de démonstration avec des données fictives réalistes.
+
+Agence :
+
+« Immo Gestion Abidjan »
+
+Immeubles :
+- Résidence Angré.
+- Résidence Cocody.
+- Immeuble Yopougon.
+
+Créer plusieurs logements, locataires fictifs, contrats, paiements, dépenses et réclamations.
+
+Prévoir :
+- Contrats actifs.
+- Contrats expirés.
+- Loyers payés.
+- Loyers partiellement payés.
+- Loyers en retard.
+- Dépenses.
+- Réclamations.
+
+Les données doivent permettre de découvrir les fonctionnalités.
+
+Ne jamais utiliser de vraies données personnelles sans autorisation.
+
+---
+
+# 26. EXIGENCES DE QUALITÉ
+
+Respecter impérativement les règles suivantes :
+
+1. Tous les boutons doivent avoir une action réelle.
+2. Tous les formulaires doivent fonctionner.
+3. Toutes les données doivent être persistées.
+4. Les filtres doivent fonctionner.
+5. Les graphiques doivent être reliés aux données.
+6. Les exports doivent fonctionner.
+7. Les permissions doivent être appliquées côté serveur.
+8. Les données des organisations doivent rester isolées.
+9. Les paiements doivent être traçables.
+10. Les erreurs doivent être gérées proprement.
+11. L'interface doit être responsive.
+12. Les pages publiques doivent être optimisées SEO.
+13. Les chargements doivent afficher des états visuels adaptés.
+14. Les formulaires doivent afficher des validations compréhensibles.
+15. Les suppressions importantes doivent demander confirmation.
+16. Les actions financières doivent être journalisées.
+
+Ne crée jamais de boutons décoratifs qui ne fonctionnent pas.
+
+Ne présente jamais une fonctionnalité simulée comme une intégration opérationnelle.
+
+Si une API externe nécessite des identifiants, préparer l'intégration et expliquer précisément les informations nécessaires.
+
+---
+
+# 27. MÉTHODE DE DÉVELOPPEMENT
+
+Développer le projet progressivement.
+
+## PHASE 1 – FONDATIONS
+- Architecture.
+- Configuration.
+- Base de données.
+- Authentification.
+- Organisations.
+- Rôles.
+- Permissions.
+- Isolation multi-tenant.
+- Design system.
+- Layout principal.
+
+## PHASE 2 – GESTION IMMOBILIÈRE
+- Biens.
+- Immeubles.
+- Logements.
+- Locataires.
+- Contrats.
+
+## PHASE 3 – GESTION FINANCIÈRE
+- Loyers.
+- Échéances.
+- Paiements.
+- Reçus.
+- Dépenses.
+
+## PHASE 4 – AUTOMATISATION
+- Rappels.
+- SMS.
+- WhatsApp.
+- Notifications.
+- Tâches planifiées.
+
+## PHASE 5 – PORTAIL LOCATAIRE
+- Connexion.
+- Consultation.
+- Paiements.
+- Réclamations.
+
+## PHASE 6 – ADMINISTRATION SAAS
+- Abonnements.
+- Plans.
+- Facturation.
+- Super administrateur.
+
+## PHASE 7 – FINALISATION
+- Sécurité.
+- Tests.
+- Optimisation.
+- Documentation.
+- Déploiement.
+
+---
+
+# 28. RÈGLES DE TRAVAIL POUR CLAUDE
+
+Tu dois respecter les règles suivantes pendant tout le développement.
+
+### Avant de coder
+
+1. Analyse le dossier du projet s'il existe déjà.
+2. Ne supprime aucun fichier sans raison et sans m'en informer.
+3. Présente l'architecture.
+4. Présente l'arborescence.
+5. Présente le schéma de base de données.
+6. Présente les principales interfaces.
+7. Présente le design system.
+8. Identifie les dépendances et services externes.
+
+### Pendant le développement
+
+- Travaille étape par étape.
+- Fournis des fichiers complets et cohérents.
+- Respecte l'architecture retenue.
+- Réutilise les composants.
+- Ne duplique pas inutilement le code.
+- Vérifie les dépendances.
+- Exécute les tests disponibles.
+- Corrige les erreurs avant de passer à la suite.
+- Ne prétends jamais qu'une commande a réussi sans l'avoir vérifiée.
+- Ne remplace pas les fonctionnalités par des simulations.
+- Conserve une documentation à jour.
+
+### Pour le design
+
+- Soigne particulièrement le tableau de bord.
+- Soigne les espaces et alignements.
+- Utilise des icônes cohérentes.
+- Utilise des graphiques professionnels.
+- Respecte la charte vert forêt et or.
+- Crée des états vides élégants.
+- Crée des formulaires agréables.
+- Assure une parfaite adaptation mobile.
+- Évite les interfaces génériques et les designs surchargés.
+
+### Pour les tests
+
+Tester :
+- Inscription.
+- Connexion.
+- Gestion des organisations.
+- Isolation des données.
+- Permissions.
+- Création d'un bien.
+- Création d'un locataire.
+- Création d'un contrat.
+- Génération d'un loyer.
+- Enregistrement d'un paiement.
+- Génération d'un reçu.
+- Gestion des abonnements.
+
+---
+
+# 29. PREMIÈRE MISSION À EXÉCUTER
+
+Commence par analyser mon environnement et le dossier du projet.
+
+Si le projet n'existe pas encore, prépare sa création.
+
+Ne développe pas toutes les fonctionnalités en une seule fois.
+
+Commence par me présenter :
+
+1. L'architecture technique.
+2. L'arborescence complète.
+3. Le schéma de la base de données.
+4. La direction artistique.
+5. Les maquettes visuelles principales.
+6. Le tableau de bord attendu.
+7. Le planning des phases.
+
+Ensuite, commence la Phase 1.
+
+Je veux voir rapidement un premier résultat visuel de qualité : une page de connexion professionnelle, un tableau de bord premium et une navigation complète.
+
+Puis développe progressivement les fonctionnalités réelles.
+
+À chaque étape :
+- Indique les fichiers créés ou modifiés.
+- Explique les commandes à exécuter.
+- Fournis le code complet.
+- Vérifie le résultat.
+- Indique ce qui reste à faire.
+
+Ne passe pas à une nouvelle phase tant que la précédente n'est pas testée et fonctionnelle.
+
+---
+
+# OBJECTIF FINAL
+
+Livrer **IMMOPAY CI**, une plateforme SaaS de gestion locative moderne, élégante, sécurisée, performante et commercialisable en Côte d'Ivoire.
+
+Je veux un produit qui inspire immédiatement confiance, avec une expérience visuelle premium, une navigation fluide et des fonctionnalités réellement opérationnelles.
+
+Le design doit donner l'impression d'utiliser un logiciel professionnel de grande qualité, et non une simple application générée automatiquement.
+
+**La qualité visuelle, la simplicité d'utilisation, la fiabilité financière et la sécurité des données sont les priorités absolues.**
