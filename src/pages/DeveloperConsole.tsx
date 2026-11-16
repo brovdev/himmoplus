@@ -94,7 +94,13 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
   const [authLoading, setAuthLoading] = useState(false);
 
   const [totpCode, setTotpCode] = useState('');
-  const [twoFaInfo, setTwoFaInfo] = useState<{ devPreviewCode?: string; otpauthUri?: string } | null>(null);
+  const [twoFaInfo, setTwoFaInfo] = useState<{
+    devPreviewCode?: string;
+    otpauthUri?: string;
+    qrDataUrl?: string;
+    manualKey?: string;
+    isFirstSetup?: boolean;
+  } | null>(null);
   const [twoFaError, setTwoFaError] = useState<string | null>(null);
   const [verifying2Fa, setVerifying2Fa] = useState(false);
 
@@ -139,13 +145,23 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
   const isDeveloper = auth?.user?.role_type === 'developer';
   const is2FaReady = Boolean(isDeveloper && auth?.twoFactorVerified);
 
-  useEffect(() => {
+  const refreshTwoFaStatus = useCallback(() => {
     if (isDeveloper && !is2FaReady) {
-      apiFetch<{ devPreviewCode?: string; otpauthUri?: string }>('/api/developer/auth/2fa-status')
+      apiFetch<{
+        devPreviewCode?: string;
+        otpauthUri?: string;
+        qrDataUrl?: string;
+        manualKey?: string;
+        isFirstSetup?: boolean;
+      }>('/api/developer/auth/2fa-status')
         .then(setTwoFaInfo)
         .catch(() => {});
     }
   }, [isDeveloper, is2FaReady]);
+
+  useEffect(() => {
+    refreshTwoFaStatus();
+  }, [refreshTwoFaStatus]);
 
   const loadSectionData = useCallback(async () => {
     if (!is2FaReady) return;
@@ -371,7 +387,7 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="dev@immopay.ci"
+                  placeholder="tanguybrovou@gmail.com"
                   className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2 text-sm focus:border-[#185C46] focus:outline-none"
                 />
               </div>
@@ -398,15 +414,15 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
                 <button
                   type="button"
                   onClick={(e) => {
-                    setEmail('dev@immopay.ci');
+                    setEmail('tanguybrovou@gmail.com');
                     setPassword('DevConsole2026!');
-                    handleDevLogin(e, 'dev@immopay.ci', 'DevConsole2026!');
+                    handleDevLogin(e, 'tanguybrovou@gmail.com', 'DevConsole2026!');
                   }}
                   className="flex w-full items-center justify-between rounded-lg border border-[#E8EEEB] bg-[#F6F8F7] px-3.5 py-2 text-xs hover:border-[#185C46] transition-colors cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2 font-semibold text-[#123C32]">
                     <Terminal className="h-3.5 w-3.5 text-[#185C46]" />
-                    Compte Développeur (dev@immopay.ci)
+                    Compte Développeur (tanguybrovou@gmail.com)
                   </span>
                   <span className="text-[#185C46] font-medium">Étape 1 →</span>
                 </button>
@@ -434,11 +450,48 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
                 />
               </div>
 
+              {twoFaInfo?.qrDataUrl && (
+                <div className="rounded-lg border border-[#E8EEEB] bg-[#F6F8F7] p-3.5 text-xs text-[#123C32]">
+                  <p className="font-semibold">
+                    Application d’authentification (Google Authenticator, Authy, Microsoft Authenticator)
+                  </p>
+                  <p className="mt-1 text-[#66736D]">
+                    Le code TOTP à 6 chiffres est généré toutes les 30 secondes dans votre application mobile après avoir
+                    scanné ce QR code :
+                  </p>
+                  <div className="mt-3 flex flex-col sm:flex-row items-center gap-3">
+                    <img
+                      src={twoFaInfo.qrDataUrl}
+                      alt="QR Code configuration TOTP IMMOPAY CI"
+                      className="h-28 w-28 rounded-lg border border-[#E8EEEB] bg-white p-1 shrink-0"
+                    />
+                    {twoFaInfo.manualKey && (
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-[11px] font-medium text-[#66736D]">Ou saisie manuelle (clé Base32) :</p>
+                        <p className="font-mono text-xs font-semibold text-[#123C32] break-all select-all">
+                          {twoFaInfo.manualKey}
+                        </p>
+                        <p className="text-[11px] text-[#66736D]">Type : Basé sur l’heure (TOTP, 30s)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {twoFaInfo?.devPreviewCode && (
                 <div className="rounded-lg border border-[#D6AE55]/40 bg-[#FBF6E8] p-3 text-xs text-[#123C32]">
-                  <p className="font-semibold">Assistant TOTP (environnement de développement) :</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold">Code TOTP instantané (environnement de dev) :</p>
+                    <button
+                      type="button"
+                      onClick={refreshTwoFaStatus}
+                      className="text-[11px] font-medium text-[#185C46] hover:underline cursor-pointer"
+                    >
+                      Actualiser
+                    </button>
+                  </div>
                   <p className="mt-1 text-[#66736D]">
-                    Code RFC 6238 actif :{' '}
+                    Code actif :{' '}
                     <button
                       type="button"
                       onClick={() => setTotpCode(twoFaInfo.devPreviewCode || '')}

@@ -807,7 +807,9 @@ function ensureDeveloperSchemaAndSeed(): void {
   `);
 
   // Seed developer account & 2FA secret idempotently
-  const existingDev = db.prepare("SELECT id FROM users WHERE role_type = 'developer'").get() as { id: number } | undefined;
+  const existingDev = db.prepare("SELECT id, email FROM users WHERE role_type = 'developer'").get() as
+    | { id: number; email: string }
+    | undefined;
   let devUserId: number;
   if (!existingDev) {
     const devPass = bcrypt.hashSync('DevConsole2026!', 10);
@@ -817,10 +819,13 @@ function ensureDeveloperSchemaAndSeed(): void {
           INSERT INTO users (full_name, email, phone, password_hash, role_type, email_verified_at)
           VALUES (?, ?, ?, ?, 'developer', datetime('now'))
         `)
-        .run('Équipe Ingénierie IMMOPAY CI', 'dev@immopay.ci', '+225 27 22 40 00 99', devPass).lastInsertRowid
+        .run('Équipe Ingénierie IMMOPAY CI', 'tanguybrovou@gmail.com', '+225 27 22 40 00 99', devPass).lastInsertRowid
     );
   } else {
     devUserId = existingDev.id;
+    if (existingDev.email === 'dev@immopay.ci') {
+      db.prepare('UPDATE users SET email = ? WHERE id = ?').run('tanguybrovou@gmail.com', devUserId);
+    }
   }
 
   const devSecret = process.env.DEVELOPER_2FA_SECRET || 'IMMOPAYDEV2FATOTP';

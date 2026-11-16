@@ -4,6 +4,7 @@ import express, { type Response } from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import QRCode from 'qrcode';
 import {
   type AuthenticatedRequest,
   SESSION_COOKIE_NAME,
@@ -245,7 +246,7 @@ developerRouter.post('/telemetry/client-error', (req, res) => {
 // DEVELOPER 2FA SETUP & VERIFICATION (AUTH REQUIRED, DEVELOPER ROLE ONLY)
 // ---------------------------------------------------------------------------
 
-developerRouter.get('/developer/auth/2fa-status', requireAuth, (req: AuthenticatedRequest, res) => {
+developerRouter.get('/developer/auth/2fa-status', requireAuth, async (req: AuthenticatedRequest, res) => {
   if (req.authUser!.role_type !== 'developer') {
     res.status(403).json({ error: 'Accès strictement réservé au rôle développeur.' });
     return;
@@ -255,16 +256,20 @@ developerRouter.get('/developer/auth/2fa-status', requireAuth, (req: Authenticat
     | undefined;
 
   const isDevEnv = process.env.NODE_ENV !== 'production';
+  const isFirstSetup = !row?.last_verified_at;
   const secret = row?.totp_secret || 'IMMOPAYDEV2FATOTP';
   const otpauthUri = `otpauth://totp/IMMOPAY-CI:${encodeURIComponent(req.authUser!.email)}?secret=${secret}&issuer=IMMOPAY-CI`;
+  const qrDataUrl = isDevEnv || isFirstSetup ? await QRCode.toDataURL(otpauthUri, { width: 180, margin: 1 }) : undefined;
 
   res.json({
     twoFactorVerified: Boolean(req.twoFactorVerified),
     enabled: Boolean(row?.enabled ?? 1),
     lastVerifiedAt: row?.last_verified_at || null,
-    // In local development, expose the live TOTP helper so the engineer can test immediately or bind an authenticator app
+    isFirstSetup,
     devPreviewCode: isDevEnv ? generateTotpCode(secret) : undefined,
-    otpauthUri: isDevEnv ? otpauthUri : undefined,
+    otpauthUri: isDevEnv || isFirstSetup ? otpauthUri : undefined,
+    qrDataUrl,
+    manualKey: isDevEnv || isFirstSetup ? secret : undefined,
   });
 });
 
