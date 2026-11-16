@@ -3,7 +3,7 @@ export interface UserInfo {
   full_name: string;
   email: string;
   phone: string | null;
-  role_type: 'super_admin' | 'org_user' | 'tenant';
+  role_type: 'super_admin' | 'org_user' | 'tenant' | 'developer';
 }
 
 export interface OrganizationInfo {
@@ -26,6 +26,7 @@ export interface OrganizationInfo {
 export interface AuthState {
   user: UserInfo;
   organizations: OrganizationInfo[];
+  twoFactorVerified?: boolean;
 }
 
 export interface SubscriptionPlan {
@@ -64,4 +65,5 @@ export type AppRoute =
   | 'subscription'
   | 'settings'
   | 'tenant-portal'
-  | 'super-admin';
+  | 'super-admin'
+  | 'developer';

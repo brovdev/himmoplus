@@ -17,7 +17,7 @@ export function initializeDatabase(): void {
       email TEXT NOT NULL UNIQUE,
       phone TEXT,
       password_hash TEXT NOT NULL,
-      role_type TEXT NOT NULL CHECK(role_type IN ('super_admin', 'org_user', 'tenant')),
+      role_type TEXT NOT NULL CHECK(role_type IN ('super_admin', 'org_user', 'tenant', 'developer')),
       email_verified_at TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -308,6 +308,7 @@ export function initializeDatabase(): void {
   `);
 
   seedInitialData();
+  ensureDeveloperSchemaAndSeed();
 }
 
 export function seedDefaultTemplates(orgId: number): void {
@@ -640,3 +641,317 @@ function seedInitialData(): void {
 
   insertSeed();
 }
+
+function ensureDeveloperSchemaAndSeed(): void {
+  // Safe migration if existing DB had users table without 'developer' role_type
+  const usersSqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get() as
+    | { sql: string }
+    | undefined;
+
+  if (usersSqlRow && !usersSqlRow.sql.includes("'developer'")) {
+    db.pragma('foreign_keys = OFF');
+    const migrateUsers = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          full_name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          phone TEXT,
+          password_hash TEXT NOT NULL,
+          role_type TEXT NOT NULL CHECK(role_type IN ('super_admin', 'org_user', 'tenant', 'developer')),
+          email_verified_at TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO users_new (id, full_name, email, phone, password_hash, role_type, email_verified_at, is_active, created_at, updated_at)
+        SELECT id, full_name, email, phone, password_hash, role_type, email_verified_at, is_active, created_at, updated_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+      `);
+    });
+    migrateUsers();
+    db.pragma('foreign_keys = ON');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      batch INTEGER NOT NULL DEFAULT 1,
+      checksum TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'executed' CHECK(status IN ('executed', 'pending', 'failed')),
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      executed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS developer_2fa (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      totp_secret TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_verified_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS system_errors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      error_code TEXT NOT NULL,
+      source TEXT NOT NULL CHECK(source IN ('backend_node', 'backend_sqlite', 'frontend_js', 'webhook', 'php_laravel')),
+      severity TEXT NOT NULL CHECK(severity IN ('critique', 'elevee', 'moyenne', 'faible')),
+      module TEXT NOT NULL,
+      message TEXT NOT NULL,
+      stack_trace TEXT,
+      file_path TEXT,
+      line_number INTEGER,
+      context_json TEXT,
+      request_method TEXT,
+      request_path TEXT,
+      status TEXT NOT NULL DEFAULT 'ouvert' CHECK(status IN ('ouvert', 'en_cours', 'resolu')),
+      resolution_note TEXT,
+      resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      resolved_at TEXT,
+      occurrences INTEGER NOT NULL DEFAULT 1,
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS api_request_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id TEXT NOT NULL,
+      method TEXT NOT NULL,
+      path TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      duration_ms REAL NOT NULL,
+      user_role TEXT,
+      ip_address TEXT,
+      response_size INTEGER NOT NULL DEFAULT 0,
+      is_error INTEGER NOT NULL DEFAULT 0,
+      error_summary TEXT,
+      headers_redacted_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sql_query_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      query_sql TEXT NOT NULL,
+      duration_ms REAL NOT NULL,
+      is_slow INTEGER NOT NULL DEFAULT 0,
+      source_route TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      http_status INTEGER,
+      latency_ms INTEGER NOT NULL DEFAULT 0,
+      attempts INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL CHECK(status IN ('succes', 'echec', 'en_attente', 'non_configure')),
+      payload_redacted_json TEXT,
+      error_message TEXT,
+      last_attempt_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS background_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('en_attente', 'en_cours', 'execute', 'echoue')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      error_reason TEXT,
+      payload_json TEXT,
+      scheduled_for TEXT NOT NULL DEFAULT (datetime('now')),
+      last_run_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS system_backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      trigger_type TEXT NOT NULL CHECK(trigger_type IN ('manuel', 'automatique')),
+      integrity_status TEXT NOT NULL DEFAULT 'ok',
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS developer_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      developer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT,
+      details_json TEXT,
+      ip_address TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS developer_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sys_errors_status ON system_errors(status, severity);
+    CREATE INDEX IF NOT EXISTS idx_api_logs_created ON api_request_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sql_logs_slow ON sql_query_logs(is_slow, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_dev_audit_created ON developer_audit_logs(created_at DESC);
+  `);
+
+  // Seed developer account & 2FA secret idempotently
+  const existingDev = db.prepare("SELECT id FROM users WHERE role_type = 'developer'").get() as { id: number } | undefined;
+  let devUserId: number;
+  if (!existingDev) {
+    const devPass = bcrypt.hashSync('DevConsole2026!', 10);
+    devUserId = Number(
+      db
+        .prepare(`
+          INSERT INTO users (full_name, email, phone, password_hash, role_type, email_verified_at)
+          VALUES (?, ?, ?, ?, 'developer', datetime('now'))
+        `)
+        .run('Équipe Ingénierie IMMOPAY CI', 'dev@immopay.ci', '+225 27 22 40 00 99', devPass).lastInsertRowid
+    );
+  } else {
+    devUserId = existingDev.id;
+  }
+
+  const devSecret = process.env.DEVELOPER_2FA_SECRET || 'IMMOPAYDEV2FATOTP';
+  db.prepare('INSERT OR IGNORE INTO developer_2fa (user_id, totp_secret, enabled) VALUES (?, ?, 1)').run(devUserId, devSecret);
+
+  // Seed schema_migrations records idempotently
+  const migStmt = db.prepare(`
+    INSERT OR IGNORE INTO schema_migrations (version, name, batch, checksum, status, duration_ms)
+    VALUES (?, ?, ?, ?, 'executed', ?)
+  `);
+  migStmt.run('2026_11_01_0001', 'create_users_organizations_roles_subscriptions', 1, 'a9f1c2e801', 14);
+  migStmt.run('2026_11_01_0002', 'create_buildings_properties_tenants_contracts', 1, 'b47d8e1209', 18);
+  migStmt.run('2026_11_01_0003', 'create_rent_invoices_payments_receipts_expenses', 1, 'c82e5a9411', 21);
+  migStmt.run('2026_11_16_0004', 'create_developer_telemetry_2fa_backups_jobs', 2, 'd10a77f390', 11);
+
+  // Seed developer_settings
+  const setStmt = db.prepare('INSERT OR IGNORE INTO developer_settings (key, value) VALUES (?, ?)');
+  setStmt.run('slow_sql_threshold_ms', '80');
+  setStmt.run('log_retention_days', '30');
+  setStmt.run('capture_js_errors', 'true');
+  setStmt.run('maintenance_mode', 'false');
+  setStmt.run('telescope_dev_enabled', 'true');
+  setStmt.run('prod_observability_sink', 'structured_json_stdout');
+
+  // Seed initial background jobs if empty
+  const jobsCount = (db.prepare('SELECT COUNT(*) as c FROM background_jobs').get() as { c: number }).c;
+  if (jobsCount === 0) {
+    const jobStmt = db.prepare(`
+      INSERT INTO background_jobs (job_type, name, status, attempts, max_attempts, duration_ms, error_reason, payload_json, last_run_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    jobStmt.run(
+      'check_expiring_contracts',
+      'Détection des baux expirant à J-30',
+      'execute',
+      1,
+      3,
+      24,
+      null,
+      JSON.stringify({ windowDays: 30, matchedContracts: 1 }),
+      new Date(Date.now() - 3600_000).toISOString()
+    );
+    jobStmt.run(
+      'sqlite_wal_checkpoint',
+      'Optimisation & checkpoint journal WAL SQLite',
+      'execute',
+      1,
+      3,
+      9,
+      null,
+      JSON.stringify({ mode: 'PASSIVE' }),
+      new Date(Date.now() - 1800_000).toISOString()
+    );
+    jobStmt.run(
+      'dispatch_due_reminders',
+      'Envoi des relances WhatsApp / SMS échéances J-5',
+      'echoue',
+      2,
+      3,
+      412,
+      'WHATSAPP_API_TOKEN absent : passerelle Meta Cloud non configurée dans .env',
+      JSON.stringify({ organizationId: 1, templateCode: 'J_MINUS_5', pendingCount: 2 }),
+      new Date(Date.now() - 900_000).toISOString()
+    );
+    jobStmt.run(
+      'sync_monthly_invoices',
+      'Contrôle idempotent des échéances mensuelles',
+      'en_attente',
+      0,
+      3,
+      0,
+      null,
+      JSON.stringify({ periodLabel: '2026-12' }),
+      null
+    );
+  }
+
+  // Seed initial webhook events if empty
+  const whCount = (db.prepare('SELECT COUNT(*) as c FROM webhook_events').get() as { c: number }).c;
+  if (whCount === 0) {
+    const whStmt = db.prepare(`
+      INSERT INTO webhook_events (provider, event_type, endpoint, http_status, latency_ms, attempts, status, payload_redacted_json, error_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    whStmt.run(
+      'wave',
+      'checkout.session.completed',
+      '/api/webhooks/wave',
+      401,
+      145,
+      2,
+      'non_configure',
+      JSON.stringify({ reference: 'WV-202611-001', amount_xof: 280000, signature: '***MASQUÉ***' }),
+      'WAVE_WEBHOOK_SECRET non défini dans les variables d’environnement serveur.'
+    );
+    whStmt.run(
+      'orange_money',
+      'payment.notification',
+      '/api/webhooks/orange-money',
+      503,
+      310,
+      1,
+      'non_configure',
+      JSON.stringify({ order_id: 'OM-202611-002', amount_xof: 350000, token: '***MASQUÉ***' }),
+      'ORANGE_MONEY_CLIENT_ID / SECRET non configurés (validation manuelle active).'
+    );
+  }
+
+  // Seed 1 historical resolved diagnostic reference if system_errors is empty
+  const errCount = (db.prepare('SELECT COUNT(*) as c FROM system_errors').get() as { c: number }).c;
+  if (errCount === 0) {
+    db.prepare(`
+      INSERT INTO system_errors (error_code, source, severity, module, message, stack_trace, file_path, line_number, context_json, request_method, request_path, status, resolution_note, resolved_by, resolved_at, occurrences)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+    `).run(
+      'ERR-SEED-001',
+      'backend_sqlite',
+      'elevee',
+      'database',
+      'RangeError: Too few parameter values were provided lors de la création initiale des rôles comptables',
+      'RangeError: Too few parameter values were provided\n    at seedInitialData (/app/applet/src/server/db.ts:451:17)\n    at initializeDatabase (/app/applet/src/server/db.ts:310:3)',
+      'src/server/db.ts',
+      451,
+      JSON.stringify({ environment: 'development', statement: 'INSERT INTO organization_users' }),
+      'BOOT',
+      'initializeDatabase',
+      'resolu',
+      'Correction appliquée : extraction de .lastInsertRowid as number sur comptableRoleId dans src/server/db.ts.',
+      devUserId,
+      1
+    );
+  }
+}
+

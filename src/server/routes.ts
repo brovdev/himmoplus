@@ -51,11 +51,11 @@ function getOrgSubscriptionLimits(orgId: number) {
     | undefined;
 }
 
-function buildAuthPayload(userId: number) {
+function buildAuthPayload(userId: number, twoFactorVerified = false) {
   const user = db
     .prepare('SELECT id, full_name, email, phone, role_type FROM users WHERE id = ?')
     .get(userId) as
-    | { id: number; full_name: string; email: string; phone: string | null; role_type: 'super_admin' | 'org_user' | 'tenant' }
+    | { id: number; full_name: string; email: string; phone: string | null; role_type: 'super_admin' | 'org_user' | 'tenant' | 'developer' }
     | undefined;
   if (!user) return null;
 
@@ -71,7 +71,7 @@ function buildAuthPayload(userId: number) {
     `)
     .all(userId);
 
-  return { user, organizations };
+  return { user, organizations, twoFactorVerified };
 }
 
 function setSessionCookie(res: Response, token: string): void {
@@ -153,7 +153,7 @@ apiRouter.post('/auth/login', (req, res) => {
   const user = db
     .prepare('SELECT id, email, password_hash, role_type, is_active FROM users WHERE lower(email) = lower(?)')
     .get(String(email).trim()) as
-    | { id: number; email: string; password_hash: string; role_type: 'super_admin' | 'org_user' | 'tenant'; is_active: number }
+    | { id: number; email: string; password_hash: string; role_type: 'super_admin' | 'org_user' | 'tenant' | 'developer'; is_active: number }
     | undefined;
 
   if (!user || !bcrypt.compareSync(String(password), user.password_hash)) {
@@ -170,12 +170,13 @@ apiRouter.post('/auth/login', (req, res) => {
   const token = signSessionToken({
     userId: user.id,
     roleType: user.role_type,
+    twoFactorVerified: user.role_type !== 'developer',
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
   });
   setSessionCookie(res, token);
 
-  const payload = buildAuthPayload(user.id);
-  logActivity(null, user.id, 'USER_LOGIN', 'user', user.id, { email: user.email }, ip);
+  const payload = buildAuthPayload(user.id, user.role_type !== 'developer');
+  logActivity(null, user.id, 'USER_LOGIN', 'user', user.id, { email: user.email, roleType: user.role_type }, ip);
   res.json(payload);
 });
 
@@ -271,7 +272,7 @@ apiRouter.post('/auth/logout', (_req, res) => {
 });
 
 apiRouter.get('/auth/me', requireAuth, (req: AuthenticatedRequest, res) => {
-  const payload = buildAuthPayload(req.authUser!.id);
+  const payload = buildAuthPayload(req.authUser!.id, Boolean(req.twoFactorVerified));
   res.json(payload);
 });
 

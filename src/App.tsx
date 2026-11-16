@@ -3,15 +3,20 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { apiFetch } from './lib/api';
 import { AdminLayout } from './pages/AdminLayout';
 import { AuthPages } from './pages/AuthPages';
+import { DeveloperConsole } from './pages/DeveloperConsole';
 import { PublicSite } from './pages/PublicSite';
 import { SuperAdminConsole } from './pages/SuperAdminConsole';
 import { TenantPortal } from './pages/TenantPortal';
 import type { AppRoute, AuthState } from './types';
 
+function isDeveloperPath(): boolean {
+  return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/developer';
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [activeOrgId, setActiveOrgId] = useState<number | null>(null);
-  const [route, setRoute] = useState<AppRoute>('public');
+  const [route, setRoute] = useState<AppRoute>(() => (isDeveloperPath() ? 'developer' : 'public'));
   const [preselectedPlan, setPreselectedPlan] = useState<string | undefined>(undefined);
   const [checkingSession, setCheckingSession] = useState(true);
   const [verifyToken, setVerifyToken] = useState<string | null>(() => {
@@ -19,10 +24,26 @@ export default function App() {
     return params.get('verify');
   });
 
+  useEffect(() => {
+    const onPopState = () => {
+      if (isDeveloperPath()) setRoute('developer');
+      else if (route === 'developer') setRoute('public');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [route]);
+
   const hydrateAuth = async () => {
     try {
       const me = await apiFetch<AuthState>('/api/auth/me');
       setAuth(me);
+      if (isDeveloperPath() || me.user.role_type === 'developer') {
+        if (me.user.role_type === 'developer') {
+          setRoute('developer');
+          if (!isDeveloperPath()) window.history.replaceState({}, '', '/developer');
+        }
+        return;
+      }
       if (me.user.role_type === 'org_user' && me.organizations.length > 0) {
         setActiveOrgId((prev) => prev || me.organizations[0].id);
         setRoute((prev) =>
@@ -46,7 +67,10 @@ export default function App() {
 
   const handleAuthenticated = (nextAuth: AuthState) => {
     setAuth(nextAuth);
-    if (nextAuth.user.role_type === 'org_user' && nextAuth.organizations.length > 0) {
+    if (nextAuth.user.role_type === 'developer') {
+      setRoute('developer');
+      if (!isDeveloperPath()) window.history.pushState({}, '', '/developer');
+    } else if (nextAuth.user.role_type === 'org_user' && nextAuth.organizations.length > 0) {
       setActiveOrgId(nextAuth.organizations[0].id);
       setRoute('dashboard');
     } else if (nextAuth.user.role_type === 'tenant') {
@@ -60,11 +84,20 @@ export default function App() {
     await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setAuth(null);
     setActiveOrgId(null);
-    setRoute('public');
+    if (isDeveloperPath()) {
+      setRoute('developer');
+    } else {
+      setRoute('public');
+    }
   };
 
   const handleNavigate = (nextRoute: AppRoute, plan?: string) => {
     if (plan) setPreselectedPlan(plan);
+    if (nextRoute === 'developer') {
+      window.history.pushState({}, '', '/developer');
+    } else if (isDeveloperPath()) {
+      window.history.pushState({}, '', '/');
+    }
     setRoute(nextRoute);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -77,6 +110,19 @@ export default function App() {
           <p className="text-xs font-medium text-[#66736D]">Chargement d’IMMOPAY CI...</p>
         </div>
       </div>
+    );
+  }
+
+  // Dedicated independent /developer route
+  if (route === 'developer' || isDeveloperPath()) {
+    return (
+      <DeveloperConsole
+        auth={auth}
+        onAuthenticated={handleAuthenticated}
+        onRefreshAuth={hydrateAuth}
+        onLogout={handleLogout}
+        onExitToPublic={() => handleNavigate('public')}
+      />
     );
   }
 
