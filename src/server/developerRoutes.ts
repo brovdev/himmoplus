@@ -1,23 +1,34 @@
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import express, { type Response } from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import QRCode from 'qrcode';
 import {
   type AuthenticatedRequest,
   SESSION_COOKIE_NAME,
   clearAllLoginRateLimits,
-  generateTotpCode,
+  logActivity,
   logDeveloperAction,
   redactSensitive,
   requireAuth,
   requireDeveloper,
   signSessionToken,
-  verifyTotpCode,
 } from './auth';
 import { db } from './db';
+import {
+  check2faRateLimit,
+  consumeRecoveryCode,
+  countRemainingRecoveryCodes,
+  decryptTotpSecret,
+  ensureUser2faRecord,
+  generateIndividualQrDataUrl,
+  issueRecoveryCodesForUser,
+  record2faAttempt,
+  rotateUser2faSecret,
+  verifyTotpCode,
+} from './twoFactor';
 
 export const developerRouter = express.Router();
 
@@ -243,64 +254,262 @@ developerRouter.post('/telemetry/client-error', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// DEVELOPER 2FA SETUP & VERIFICATION (AUTH REQUIRED, DEVELOPER ROLE ONLY)
+// 2FA TOTP & RECOVERY CODES (DEVELOPER & SUPER ADMIN ONLY)
 // ---------------------------------------------------------------------------
 
-developerRouter.get('/developer/auth/2fa-status', requireAuth, async (req: AuthenticatedRequest, res) => {
-  if (req.authUser!.role_type !== 'developer') {
-    res.status(403).json({ error: 'Accès strictement réservé au rôle développeur.' });
+function isPrivileged2faRole(roleType: string): roleType is 'developer' | 'super_admin' {
+  return roleType === 'developer' || roleType === 'super_admin';
+}
+
+function log2faAudit(
+  userId: number,
+  roleType: 'developer' | 'super_admin',
+  action: string,
+  details: Record<string, unknown>,
+  ip?: string
+): void {
+  if (roleType === 'developer') {
+    logDeveloperAction(userId, action, 'auth_2fa', userId, details, ip);
+  }
+  logActivity(null, userId, action, 'auth_2fa', userId, details, ip);
+}
+
+async function handle2faStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const roleType = req.authUser!.role_type;
+  if (!isPrivileged2faRole(roleType)) {
+    res.status(403).json({ error: 'Accès strictement réservé aux comptes administrateur et développeur.' });
     return;
   }
-  const row = db.prepare('SELECT totp_secret, enabled, last_verified_at FROM developer_2fa WHERE user_id = ?').get(req.authUser!.id) as
-    | { totp_secret: string; enabled: number; last_verified_at: string | null }
-    | undefined;
 
-  const isDevEnv = process.env.NODE_ENV !== 'production';
-  const isFirstSetup = !row?.last_verified_at;
-  const secret = row?.totp_secret || 'IMMOPAYDEV2FATOTP';
-  const otpauthUri = `otpauth://totp/IMMOPAY-CI:${encodeURIComponent(req.authUser!.email)}?secret=${secret}&issuer=IMMOPAY-CI`;
-  const qrDataUrl = isDevEnv || isFirstSetup ? await QRCode.toDataURL(otpauthUri, { width: 180, margin: 1 }) : undefined;
+  const record = ensureUser2faRecord(req.authUser!.id);
+  const isActivated = Boolean(record.is_activated);
+  const remainingRecoveryCodes = countRemainingRecoveryCodes(req.authUser!.id);
+  const rateStatus = check2faRateLimit(req.authUser!.id, req.ip || 'unknown');
+
+  // Le QR code d'activation individuel n'est généré et affiché QUE lors de l'enrôlement initial
+  // (tant que le compte n'a pas encore validé son premier code TOTP).
+  let qrDataUrl: string | undefined;
+  let manualKey: string | undefined;
+  if (!isActivated) {
+    const plainSecret = decryptTotpSecret(record.totp_secret_encrypted);
+    qrDataUrl = await generateIndividualQrDataUrl(req.authUser!.email, plainSecret);
+    manualKey = plainSecret;
+  }
 
   res.json({
     twoFactorVerified: Boolean(req.twoFactorVerified),
-    enabled: Boolean(row?.enabled ?? 1),
-    lastVerifiedAt: row?.last_verified_at || null,
-    isFirstSetup,
-    devPreviewCode: isDevEnv ? generateTotpCode(secret) : undefined,
-    otpauthUri: isDevEnv || isFirstSetup ? otpauthUri : undefined,
+    enabled: Boolean(record.enabled),
+    isActivated,
+    isFirstSetup: !isActivated,
+    lastVerifiedAt: record.last_verified_at || null,
+    remainingRecoveryCodes,
+    remainingAttempts: rateStatus.remainingAttempts,
     qrDataUrl,
-    manualKey: isDevEnv || isFirstSetup ? secret : undefined,
+    manualKey,
   });
-});
+}
 
-developerRouter.post('/developer/auth/verify-2fa', requireAuth, (req: AuthenticatedRequest, res) => {
-  if (req.authUser!.role_type !== 'developer') {
-    res.status(403).json({ error: 'Accès strictement réservé au rôle développeur.' });
-    return;
-  }
-  const { code } = req.body || {};
-  const row = db.prepare('SELECT totp_secret FROM developer_2fa WHERE user_id = ?').get(req.authUser!.id) as
-    | { totp_secret: string }
-    | undefined;
-  const secret = row?.totp_secret || 'IMMOPAYDEV2FATOTP';
-
-  if (!verifyTotpCode(secret, String(code || ''))) {
-    logDeveloperAction(req.authUser!.id, 'DEV_2FA_FAILED', 'auth', req.authUser!.id, { reason: 'invalid_totp' }, req.ip);
-    res.status(401).json({ error: 'Code 2FA invalide ou expiré. Vérifiez votre application d’authentification.' });
+function handle2faVerify(req: AuthenticatedRequest, res: Response): void {
+  const roleType = req.authUser!.role_type;
+  if (!isPrivileged2faRole(roleType)) {
+    res.status(403).json({ error: 'Accès strictement réservé aux comptes administrateur et développeur.' });
     return;
   }
 
-  db.prepare("UPDATE developer_2fa SET last_verified_at = datetime('now') WHERE user_id = ?").run(req.authUser!.id);
+  const ip = req.ip || 'unknown';
+  const rate = check2faRateLimit(req.authUser!.id, ip);
+  if (!rate.allowed) {
+    log2faAudit(
+      req.authUser!.id,
+      roleType,
+      '2FA_RATE_LIMITED',
+      { retryAfterSec: rate.retryAfterSec, roleType },
+      ip
+    );
+    res.status(429).json({
+      error: `Trop de tentatives 2FA échouées. Compte temporairement verrouillé pendant ${Math.ceil((rate.retryAfterSec || 60) / 60)} min.`,
+      retryAfterSec: rate.retryAfterSec,
+    });
+    return;
+  }
+
+  const { code, recoveryCode } = req.body || {};
+  const record = ensureUser2faRecord(req.authUser!.id);
+  const wasActivated = Boolean(record.is_activated);
+
+  let verified = false;
+  let method: 'totp' | 'recovery' = 'totp';
+  let matchedStep: number | undefined;
+
+  if (typeof recoveryCode === 'string' && recoveryCode.trim().length > 0) {
+    method = 'recovery';
+    if (!wasActivated) {
+      res.status(400).json({ error: 'Veuillez d’abord activer la 2FA avec votre application Authenticator.' });
+      return;
+    }
+    verified = consumeRecoveryCode(req.authUser!.id, recoveryCode);
+  } else {
+    const plainSecret = decryptTotpSecret(record.totp_secret_encrypted);
+    const check = verifyTotpCode(plainSecret, String(code || ''), record.last_used_step);
+    if (check.replayed) {
+      record2faAttempt(req.authUser!.id, ip, false, 'totp');
+      log2faAudit(req.authUser!.id, roleType, '2FA_REPLAY_BLOCKED', { roleType }, ip);
+      res.status(401).json({
+        error: 'Ce code TOTP a déjà été utilisé. Veuillez attendre le prochain code à 6 chiffres (30 s).',
+      });
+      return;
+    }
+    verified = check.valid;
+    matchedStep = check.matchedStep;
+  }
+
+  if (!verified) {
+    record2faAttempt(req.authUser!.id, ip, false, method);
+    const afterRate = check2faRateLimit(req.authUser!.id, ip);
+    log2faAudit(
+      req.authUser!.id,
+      roleType,
+      '2FA_FAILED',
+      { method, roleType, remainingAttempts: afterRate.remainingAttempts },
+      ip
+    );
+    res.status(401).json({
+      error:
+        method === 'recovery'
+          ? 'Code de récupération invalide ou déjà utilisé.'
+          : `Code TOTP invalide ou expiré (${afterRate.remainingAttempts} essai(s) restant(s)).`,
+      remainingAttempts: afterRate.remainingAttempts,
+    });
+    return;
+  }
+
+  record2faAttempt(req.authUser!.id, ip, true, method);
+  db.prepare(`
+    UPDATE developer_2fa
+    SET is_activated = 1,
+        last_verified_at = datetime('now'),
+        last_used_step = COALESCE(?, last_used_step),
+        updated_at = datetime('now')
+    WHERE user_id = ?
+  `).run(matchedStep ?? null, req.authUser!.id);
+
+  let issuedRecoveryCodes: string[] | undefined;
+  if (!wasActivated || countRemainingRecoveryCodes(req.authUser!.id) === 0 && !wasActivated) {
+    issuedRecoveryCodes = issueRecoveryCodesForUser(req.authUser!.id);
+  }
+
   const upgradedToken = signSessionToken({
     userId: req.authUser!.id,
-    roleType: 'developer',
+    roleType,
     twoFactorVerified: true,
     exp: Date.now() + 12 * 60 * 60 * 1000,
   });
   setSessionCookie(res, upgradedToken);
-  logDeveloperAction(req.authUser!.id, 'DEV_2FA_VERIFIED', 'auth', req.authUser!.id, { method: 'totp_rfc6238' }, req.ip);
 
-  res.json({ verified: true });
+  log2faAudit(
+    req.authUser!.id,
+    roleType,
+    !wasActivated ? '2FA_ACTIVATED' : method === 'recovery' ? '2FA_RECOVERY_CODE_USED' : '2FA_VERIFIED',
+    { method, roleType, firstActivation: !wasActivated },
+    ip
+  );
+
+  res.json({
+    verified: true,
+    firstActivation: !wasActivated,
+    recoveryCodes: issuedRecoveryCodes,
+    remainingRecoveryCodes: countRemainingRecoveryCodes(req.authUser!.id),
+  });
+}
+
+developerRouter.get('/developer/auth/2fa-status', requireAuth, handle2faStatus);
+developerRouter.post('/developer/auth/verify-2fa', requireAuth, handle2faVerify);
+developerRouter.get('/auth/2fa/status', requireAuth, handle2faStatus);
+developerRouter.post('/auth/2fa/verify', requireAuth, handle2faVerify);
+
+developerRouter.post('/auth/2fa/recovery-codes/regenerate', requireAuth, (req: AuthenticatedRequest, res) => {
+  const roleType = req.authUser!.role_type;
+  if (!isPrivileged2faRole(roleType) || !req.twoFactorVerified) {
+    res.status(403).json({ error: 'Session 2FA vérifiée requise.' });
+    return;
+  }
+  const ip = req.ip || 'unknown';
+  const rate = check2faRateLimit(req.authUser!.id, ip);
+  if (!rate.allowed) {
+    res.status(429).json({ error: 'Trop de tentatives. Réessayez plus tard.', retryAfterSec: rate.retryAfterSec });
+    return;
+  }
+
+  const { currentCode } = req.body || {};
+  const record = ensureUser2faRecord(req.authUser!.id);
+  const plainSecret = decryptTotpSecret(record.totp_secret_encrypted);
+  const check = verifyTotpCode(plainSecret, String(currentCode || ''), record.last_used_step);
+  if (!check.valid) {
+    record2faAttempt(req.authUser!.id, ip, false, 'totp');
+    log2faAudit(req.authUser!.id, roleType, '2FA_RECOVERY_REGEN_FAILED', { roleType }, ip);
+    res.status(401).json({ error: 'Code TOTP actuel invalide ou expiré pour confirmer la régénération.' });
+    return;
+  }
+
+  record2faAttempt(req.authUser!.id, ip, true, 'totp');
+  db.prepare("UPDATE developer_2fa SET last_used_step = ?, updated_at = datetime('now') WHERE user_id = ?").run(
+    check.matchedStep ?? null,
+    req.authUser!.id
+  );
+  const recoveryCodes = issueRecoveryCodesForUser(req.authUser!.id);
+  log2faAudit(req.authUser!.id, roleType, '2FA_RECOVERY_CODES_REGENERATED', { count: recoveryCodes.length }, ip);
+
+  res.json({
+    recoveryCodes,
+    remainingRecoveryCodes: recoveryCodes.length,
+    message: 'Nouveaux codes de récupération générés. Conservez-les hors ligne (les anciens sont annulés).',
+  });
+});
+
+developerRouter.post('/auth/2fa/rotate', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const roleType = req.authUser!.role_type;
+  if (!isPrivileged2faRole(roleType) || !req.twoFactorVerified) {
+    res.status(403).json({ error: 'Session 2FA vérifiée requise.' });
+    return;
+  }
+  const ip = req.ip || 'unknown';
+  const rate = check2faRateLimit(req.authUser!.id, ip);
+  if (!rate.allowed) {
+    res.status(429).json({ error: 'Trop de tentatives. Réessayez plus tard.', retryAfterSec: rate.retryAfterSec });
+    return;
+  }
+
+  const { currentCode } = req.body || {};
+  const record = ensureUser2faRecord(req.authUser!.id);
+  const plainSecret = decryptTotpSecret(record.totp_secret_encrypted);
+  const check = verifyTotpCode(plainSecret, String(currentCode || ''), record.last_used_step);
+  if (!check.valid) {
+    record2faAttempt(req.authUser!.id, ip, false, 'totp');
+    res.status(401).json({ error: 'Code TOTP actuel invalide pour renouveler votre clé 2FA.' });
+    return;
+  }
+
+  record2faAttempt(req.authUser!.id, ip, true, 'totp');
+  const nextRecord = rotateUser2faSecret(req.authUser!.id);
+  const nextPlain = decryptTotpSecret(nextRecord.totp_secret_encrypted);
+  const qrDataUrl = await generateIndividualQrDataUrl(req.authUser!.email, nextPlain);
+
+  // Exiger la validation immédiate du nouveau QR code sur la session
+  const downgradedToken = signSessionToken({
+    userId: req.authUser!.id,
+    roleType,
+    twoFactorVerified: false,
+    exp: Date.now() + 30 * 60 * 1000,
+  });
+  setSessionCookie(res, downgradedToken);
+  log2faAudit(req.authUser!.id, roleType, '2FA_SECRET_ROTATED', { roleType }, ip);
+
+  res.json({
+    rotated: true,
+    qrDataUrl,
+    manualKey: nextPlain,
+    message: 'Nouveau secret individuel généré. Scannez le QR code et validez le premier code TOTP.',
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -953,7 +1162,57 @@ developerRouter.post('/developer/backups/create', requireAuth, requireDeveloper,
 // SECURITY, SETTINGS & SENSITIVE TECHNICAL TOOLS
 // ---------------------------------------------------------------------------
 
-developerRouter.get('/developer/security', requireAuth, requireDeveloper, (_req, res) => {
+developerRouter.post('/developer/accounts', requireAuth, requireDeveloper, (req: AuthenticatedRequest, res) => {
+  const { fullName, email, password, phone } = req.body || {};
+  if (!fullName || !email || !password) {
+    res.status(400).json({ error: 'Nom complet, e-mail et mot de passe sont obligatoires.' });
+    return;
+  }
+  if (String(password).length < 12) {
+    res.status(400).json({ error: 'Le mot de passe d’un compte développeur doit contenir au moins 12 caractères.' });
+    return;
+  }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const exists = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmail);
+  if (exists) {
+    res.status(409).json({ error: 'Un compte utilisateur existe déjà avec cet e-mail.' });
+    return;
+  }
+
+  const hash = bcrypt.hashSync(String(password), 10);
+  const info = db
+    .prepare(`
+      INSERT INTO users (full_name, email, phone, password_hash, role_type, email_verified_at)
+      VALUES (?, ?, ?, ?, 'developer', datetime('now'))
+    `)
+    .run(String(fullName).trim(), normalizedEmail, phone ? String(phone).trim() : null, hash);
+
+  const newDevId = Number(info.lastInsertRowid);
+  // Chaque développeur reçoit son propre secret TOTP aléatoire chiffré individuellement en base
+  ensureUser2faRecord(newDevId);
+
+  logDeveloperAction(
+    req.authUser!.id,
+    'DEV_ACCOUNT_CREATED',
+    'user',
+    newDevId,
+    { email: normalizedEmail, individual2faProvisioned: true },
+    req.ip
+  );
+
+  res.status(201).json({
+    account: {
+      id: newDevId,
+      full_name: String(fullName).trim(),
+      email: normalizedEmail,
+      role_type: 'developer',
+      twoFactorActivated: false,
+    },
+    message: 'Compte développeur créé avec secret TOTP individuel chiffré. Il devra scanner son propre QR code à sa première connexion.',
+  });
+});
+
+developerRouter.get('/developer/security', requireAuth, requireDeveloper, (req: AuthenticatedRequest, res) => {
   const auditLogs = db
     .prepare(`
       SELECT dal.*, u.full_name as developer_name, u.email as developer_email
@@ -969,17 +1228,53 @@ developerRouter.get('/developer/security', requireAuth, requireDeveloper, (_req,
       SELECT al.id, al.action, al.details_json, al.ip_address, al.created_at, u.role_type
       FROM activity_logs al
       LEFT JOIN users u ON u.id = al.user_id
-      WHERE al.action = 'USER_LOGIN'
+      WHERE al.action IN ('USER_LOGIN', '2FA_ACTIVATED', '2FA_VERIFIED', '2FA_FAILED', '2FA_RATE_LIMITED', '2FA_RECOVERY_CODE_USED')
       ORDER BY al.id DESC
-      LIMIT 25
+      LIMIT 30
     `)
     .all();
 
+  const developerAccounts = db
+    .prepare(`
+      SELECT u.id, u.full_name, u.email, u.is_active, u.created_at,
+             d.enabled, d.is_activated, d.last_verified_at,
+             (SELECT COUNT(*) FROM two_factor_recovery_codes rc WHERE rc.user_id = u.id AND rc.used_at IS NULL) as remaining_recovery_codes
+      FROM users u
+      LEFT JOIN developer_2fa d ON d.user_id = u.id
+      WHERE u.role_type IN ('developer', 'super_admin')
+      ORDER BY u.id ASC
+    `)
+    .all();
+
+  const myRecord = ensureUser2faRecord(req.authUser!.id);
+  const myRemainingRecoveryCodes = countRemainingRecoveryCodes(req.authUser!.id);
+
   const securityChecks = [
-    { name: 'Isolation rôle developer + 2FA TOTP obligatoire', status: 'actif', detail: 'Session signée HMAC-SHA256 + cookie HttpOnly SameSite=Lax' },
-    { name: 'Masquage automatique des secrets & tokens', status: 'actif', detail: 'redactSensitive() actif sur logs API, erreurs et webhooks' },
-    { name: 'Protection des tables financières', status: 'actif', detail: 'Aucune écriture/suppression directe autorisée depuis /developer' },
-    { name: 'Masquage des erreurs techniques côté client', status: 'actif', detail: 'Messages génériques avec code ERR-... uniquement côté utilisateur final' },
+    {
+      name: 'Clé maître DEVELOPER_2FA_SECRET (AES-256-GCM + HKDF)',
+      status: process.env.DEVELOPER_2FA_SECRET ? 'actif' : 'recommandation',
+      detail: 'Chargée exclusivement côté serveur pour chiffrer les secrets TOTP individuels en base (jamais exposée au client)',
+    },
+    {
+      name: 'Secrets TOTP individuels chiffrés & QR code par développeur',
+      status: 'actif',
+      detail: 'Aucun secret global partagé — chaque développeur / super-admin possède sa propre clé Base32 chiffrée avec IV aléatoire + anti-rejeu',
+    },
+    {
+      name: 'Codes de récupération à usage unique + Rate-limiting 2FA',
+      status: 'actif',
+      detail: 'Hachage HMAC-SHA256 en base, consommation atomique, blocage persistant après 5 échecs / 15 min',
+    },
+    {
+      name: 'Protection 2FA obligatoire sur routes /developer et /super-admin',
+      status: 'actif',
+      detail: 'requireDeveloper et requireSuperAdmin imposent rôle valide + twoFactorVerified=true',
+    },
+    {
+      name: 'Masquage automatique des secrets & erreurs techniques',
+      status: 'actif',
+      detail: 'redactSensitive() + scrub2faMasterSecretFromText() actifs sur logs API, erreurs et audit',
+    },
     {
       name: 'Clé de session SESSION_SECRET personnalisée',
       status: process.env.SESSION_SECRET ? 'actif' : 'recommandation',
@@ -987,7 +1282,17 @@ developerRouter.get('/developer/security', requireAuth, requireDeveloper, (_req,
     },
   ];
 
-  res.json({ auditLogs, recentLogins, securityChecks });
+  res.json({
+    auditLogs,
+    recentLogins,
+    securityChecks,
+    developerAccounts,
+    twoFactorSummary: {
+      isActivated: Boolean(myRecord.is_activated),
+      lastVerifiedAt: myRecord.last_verified_at,
+      remainingRecoveryCodes: myRemainingRecoveryCodes,
+    },
+  });
 });
 
 developerRouter.get('/developer/settings', requireAuth, requireDeveloper, (_req, res) => {

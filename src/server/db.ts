@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import path from 'path';
+import { ensureUser2faRecord } from './twoFactor';
 
 const dbPath = path.resolve(process.cwd(), 'immopay.db');
 export const db = new Database(dbPath);
@@ -688,9 +689,31 @@ function ensureDeveloperSchemaAndSeed(): void {
 
     CREATE TABLE IF NOT EXISTS developer_2fa (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      totp_secret TEXT NOT NULL,
+      totp_secret TEXT NOT NULL DEFAULT '__ENCRYPTED__',
+      totp_secret_encrypted TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
-      last_verified_at TEXT
+      is_activated INTEGER NOT NULL DEFAULT 0,
+      last_verified_at TEXT,
+      last_used_step INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS two_factor_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip_address TEXT NOT NULL,
+      success INTEGER NOT NULL DEFAULT 0,
+      method TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS system_errors (
@@ -804,9 +827,29 @@ function ensureDeveloperSchemaAndSeed(): void {
     CREATE INDEX IF NOT EXISTS idx_api_logs_created ON api_request_logs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_sql_logs_slow ON sql_query_logs(is_slow, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_dev_audit_created ON developer_audit_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_2fa_recovery_user ON two_factor_recovery_codes(user_id, used_at);
+    CREATE INDEX IF NOT EXISTS idx_2fa_attempts_lookup ON two_factor_attempts(user_id, ip_address, created_at);
   `);
 
-  // Seed developer account & 2FA secret idempotently
+  // Idempotent migration of developer_2fa columns to support per-user encrypted secrets & anti-replay
+  const twoFaCols = (db.prepare('PRAGMA table_info(developer_2fa)').all() as Array<{ name: string }>).map((c) => c.name);
+  if (!twoFaCols.includes('totp_secret_encrypted')) {
+    db.exec('ALTER TABLE developer_2fa ADD COLUMN totp_secret_encrypted TEXT');
+  }
+  if (!twoFaCols.includes('is_activated')) {
+    db.exec('ALTER TABLE developer_2fa ADD COLUMN is_activated INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!twoFaCols.includes('last_used_step')) {
+    db.exec('ALTER TABLE developer_2fa ADD COLUMN last_used_step INTEGER');
+  }
+  if (!twoFaCols.includes('created_at')) {
+    db.exec('ALTER TABLE developer_2fa ADD COLUMN created_at TEXT');
+  }
+  if (!twoFaCols.includes('updated_at')) {
+    db.exec('ALTER TABLE developer_2fa ADD COLUMN updated_at TEXT');
+  }
+
+  // Seed developer account & individual encrypted 2FA secret idempotently
   const existingDev = db.prepare("SELECT id, email FROM users WHERE role_type = 'developer'").get() as
     | { id: number; email: string }
     | undefined;
@@ -828,8 +871,13 @@ function ensureDeveloperSchemaAndSeed(): void {
     }
   }
 
-  const devSecret = process.env.DEVELOPER_2FA_SECRET || 'IMMOPAYDEV2FATOTP';
-  db.prepare('INSERT OR IGNORE INTO developer_2fa (user_id, totp_secret, enabled) VALUES (?, ?, 1)').run(devUserId, devSecret);
+  // Provision individual encrypted TOTP secret for every developer & super_admin account (never shared)
+  const privilegedUsers = db
+    .prepare("SELECT id FROM users WHERE role_type IN ('developer', 'super_admin')")
+    .all() as Array<{ id: number }>;
+  for (const u of privilegedUsers) {
+    ensureUser2faRecord(u.id);
+  }
 
   // Seed schema_migrations records idempotently
   const migStmt = db.prepare(`
@@ -840,6 +888,7 @@ function ensureDeveloperSchemaAndSeed(): void {
   migStmt.run('2026_11_01_0002', 'create_buildings_properties_tenants_contracts', 1, 'b47d8e1209', 18);
   migStmt.run('2026_11_01_0003', 'create_rent_invoices_payments_receipts_expenses', 1, 'c82e5a9411', 21);
   migStmt.run('2026_11_16_0004', 'create_developer_telemetry_2fa_backups_jobs', 2, 'd10a77f390', 11);
+  migStmt.run('2026_11_19_0005', 'encrypt_per_user_2fa_secrets_and_recovery_codes', 3, 'e48c91a207', 9);
 
   // Seed developer_settings
   const setStmt = db.prepare('INSERT OR IGNORE INTO developer_settings (key, value) VALUES (?, ?)');

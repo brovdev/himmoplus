@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
+import { TwoFactorGate } from '../components/TwoFactorGate';
 import { ConfirmDialog, EmptyState, Modal, SkeletonRows, StatCard } from '../components/ui';
 import { apiFetch } from '../lib/api';
 import type { AuthState } from '../types';
@@ -93,16 +94,12 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [totpCode, setTotpCode] = useState('');
-  const [twoFaInfo, setTwoFaInfo] = useState<{
-    devPreviewCode?: string;
-    otpauthUri?: string;
-    qrDataUrl?: string;
-    manualKey?: string;
-    isFirstSetup?: boolean;
-  } | null>(null);
-  const [twoFaError, setTwoFaError] = useState<string | null>(null);
-  const [verifying2Fa, setVerifying2Fa] = useState(false);
+  // 2FA management & new developer account state (Security tab)
+  const [confirmTotpFor2faAction, setConfirmTotpFor2faAction] = useState('');
+  const [regeneratedCodes, setRegeneratedCodes] = useState<string[] | null>(null);
+  const [twoFaMgmtLoading, setTwoFaMgmtLoading] = useState(false);
+  const [newDevForm, setNewDevForm] = useState({ fullName: '', email: '', password: '', phone: '' });
+  const [creatingDev, setCreatingDev] = useState(false);
 
   // Console state
   const [section, setSection] = useState<DevSection>('overview');
@@ -144,24 +141,6 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
 
   const isDeveloper = auth?.user?.role_type === 'developer';
   const is2FaReady = Boolean(isDeveloper && auth?.twoFactorVerified);
-
-  const refreshTwoFaStatus = useCallback(() => {
-    if (isDeveloper && !is2FaReady) {
-      apiFetch<{
-        devPreviewCode?: string;
-        otpauthUri?: string;
-        qrDataUrl?: string;
-        manualKey?: string;
-        isFirstSetup?: boolean;
-      }>('/api/developer/auth/2fa-status')
-        .then(setTwoFaInfo)
-        .catch(() => {});
-    }
-  }, [isDeveloper, is2FaReady]);
-
-  useEffect(() => {
-    refreshTwoFaStatus();
-  }, [refreshTwoFaStatus]);
 
   const loadSectionData = useCallback(async () => {
     if (!is2FaReady) return;
@@ -239,20 +218,55 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
     }
   };
 
-  const handleVerify2Fa = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setVerifying2Fa(true);
-    setTwoFaError(null);
+  const handleRegenerateRecoveryCodes = async () => {
+    setTwoFaMgmtLoading(true);
     try {
-      await apiFetch('/api/developer/auth/verify-2fa', {
+      const res = await apiFetch<{ recoveryCodes: string[]; message: string }>('/api/auth/2fa/recovery-codes/regenerate', {
         method: 'POST',
-        body: JSON.stringify({ code: totpCode }),
+        body: JSON.stringify({ currentCode: confirmTotpFor2faAction }),
       });
+      setRegeneratedCodes(res.recoveryCodes);
+      setConfirmTotpFor2faAction('');
+      setFeedback({ type: 'ok', text: res.message });
+      loadSectionData();
+    } catch (err) {
+      setFeedback({ type: 'err', text: (err as Error).message });
+    } finally {
+      setTwoFaMgmtLoading(false);
+    }
+  };
+
+  const handleRotate2faKey = async () => {
+    setTwoFaMgmtLoading(true);
+    try {
+      await apiFetch('/api/auth/2fa/rotate', {
+        method: 'POST',
+        body: JSON.stringify({ currentCode: confirmTotpFor2faAction }),
+      });
+      setConfirmTotpFor2faAction('');
       await onRefreshAuth();
     } catch (err) {
-      setTwoFaError((err as Error).message);
+      setFeedback({ type: 'err', text: (err as Error).message });
     } finally {
-      setVerifying2Fa(false);
+      setTwoFaMgmtLoading(false);
+    }
+  };
+
+  const handleCreateDevAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingDev(true);
+    try {
+      const res = await apiFetch<{ message: string }>('/api/developer/accounts', {
+        method: 'POST',
+        body: JSON.stringify(newDevForm),
+      });
+      setNewDevForm({ fullName: '', email: '', password: '', phone: '' });
+      setFeedback({ type: 'ok', text: res.message });
+      loadSectionData();
+    } catch (err) {
+      setFeedback({ type: 'err', text: (err as Error).message });
+    } finally {
+      setCreatingDev(false);
     }
   };
 
@@ -345,7 +359,20 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
     );
   }
 
-  if (!auth || !is2FaReady) {
+  if (auth && !is2FaReady) {
+    return (
+      <TwoFactorGate
+        title="Vérification 2FA obligatoire"
+        subtitle="Console Développeur IMMOPAY CI · Accès restreint"
+        userEmail={auth.user.email}
+        onVerified={onRefreshAuth}
+        onLogout={onLogout}
+        onExitToPublic={onExitToPublic}
+      />
+    );
+  }
+
+  if (!auth) {
     return (
       <div className="min-h-screen bg-[#123C32] flex items-center justify-center p-6">
         <div className="max-w-md w-full rounded-xl border border-white/15 bg-white p-7 sm:p-8">
@@ -363,166 +390,66 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
 
           <div className="mt-6 border-t border-[#E8EEEB] pt-5">
             <p className="text-xs font-semibold text-[#185C46]">Console Développeur IMMOPAY CI · Accès restreint</p>
-            <h1 className="mt-1 font-display text-xl font-bold text-[#123C32]">
-              {!auth ? 'Authentification Ingénierie' : 'Vérification 2FA obligatoire'}
-            </h1>
+            <h1 className="mt-1 font-display text-xl font-bold text-[#123C32]">Authentification Ingénierie</h1>
             <p className="mt-1 text-xs text-[#66736D]">
-              {!auth
-                ? 'Authentification obligatoire avec rôle developer et journalisation complète des actions.'
-                : 'Saisissez le code TOTP à 6 chiffres généré par votre application d’authentification.'}
+              Authentification obligatoire avec rôle developer, vérification 2FA TOTP individuelle et journalisation complète.
             </p>
           </div>
 
-          {!auth ? (
-            <form onSubmit={handleDevLogin} className="mt-5 space-y-4">
-              {authError && (
-                <div className="rounded-lg border border-[#D94B4B]/30 bg-[#FDECEC] px-3.5 py-2.5 text-xs font-medium text-[#D94B4B]">
-                  {authError}
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-medium text-[#123C32] mb-1">E-mail développeur</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tanguybrovou@gmail.com"
-                  className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2 text-sm focus:border-[#185C46] focus:outline-none"
-                />
+          <form onSubmit={handleDevLogin} className="mt-5 space-y-4">
+            {authError && (
+              <div className="rounded-lg border border-[#D94B4B]/30 bg-[#FDECEC] px-3.5 py-2.5 text-xs font-medium text-[#D94B4B]">
+                {authError}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[#123C32] mb-1">Mot de passe</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2 text-sm focus:border-[#185C46] focus:outline-none"
-                />
-              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-[#123C32] mb-1">E-mail développeur</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tanguybrovou@gmail.com"
+                className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2 text-sm focus:border-[#185C46] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#123C32] mb-1">Mot de passe</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2 text-sm focus:border-[#185C46] focus:outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full rounded-lg bg-[#185C46] py-2.5 text-sm font-semibold text-white hover:bg-[#123C32] transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {authLoading ? 'Vérification...' : 'Continuer vers 2FA'}
+            </button>
+
+            <div className="border-t border-[#E8EEEB] pt-4">
               <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full rounded-lg bg-[#185C46] py-2.5 text-sm font-semibold text-white hover:bg-[#123C32] transition-colors cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={(e) => {
+                  setEmail('tanguybrovou@gmail.com');
+                  setPassword('DevConsole2026!');
+                  handleDevLogin(e, 'tanguybrovou@gmail.com', 'DevConsole2026!');
+                }}
+                className="flex w-full items-center justify-between rounded-lg border border-[#E8EEEB] bg-[#F6F8F7] px-3.5 py-2 text-xs hover:border-[#185C46] transition-colors cursor-pointer"
               >
-                {authLoading ? 'Vérification...' : 'Continuer vers 2FA'}
+                <span className="inline-flex items-center gap-2 font-semibold text-[#123C32]">
+                  <Terminal className="h-3.5 w-3.5 text-[#185C46]" />
+                  Compte Développeur (tanguybrovou@gmail.com)
+                </span>
+                <span className="text-[#185C46] font-medium">Étape 1 →</span>
               </button>
-
-              <div className="border-t border-[#E8EEEB] pt-4">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    setEmail('tanguybrovou@gmail.com');
-                    setPassword('DevConsole2026!');
-                    handleDevLogin(e, 'tanguybrovou@gmail.com', 'DevConsole2026!');
-                  }}
-                  className="flex w-full items-center justify-between rounded-lg border border-[#E8EEEB] bg-[#F6F8F7] px-3.5 py-2 text-xs hover:border-[#185C46] transition-colors cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2 font-semibold text-[#123C32]">
-                    <Terminal className="h-3.5 w-3.5 text-[#185C46]" />
-                    Compte Développeur (tanguybrovou@gmail.com)
-                  </span>
-                  <span className="text-[#185C46] font-medium">Étape 1 →</span>
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerify2Fa} className="mt-5 space-y-4">
-              {twoFaError && (
-                <div className="rounded-lg border border-[#D94B4B]/30 bg-[#FDECEC] px-3.5 py-2.5 text-xs font-medium text-[#D94B4B]">
-                  {twoFaError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-[#123C32] mb-1">Code TOTP (6 chiffres)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className="w-full rounded-lg border border-[#E8EEEB] px-3.5 py-2.5 text-center font-mono text-lg font-bold tracking-[0.35em] text-[#123C32] focus:border-[#185C46] focus:outline-none"
-                />
-              </div>
-
-              {twoFaInfo?.qrDataUrl && (
-                <div className="rounded-lg border border-[#E8EEEB] bg-[#F6F8F7] p-3.5 text-xs text-[#123C32]">
-                  <p className="font-semibold">
-                    Application d’authentification (Google Authenticator, Authy, Microsoft Authenticator)
-                  </p>
-                  <p className="mt-1 text-[#66736D]">
-                    Le code TOTP à 6 chiffres est généré toutes les 30 secondes dans votre application mobile après avoir
-                    scanné ce QR code :
-                  </p>
-                  <div className="mt-3 flex flex-col sm:flex-row items-center gap-3">
-                    <img
-                      src={twoFaInfo.qrDataUrl}
-                      alt="QR Code configuration TOTP IMMOPAY CI"
-                      className="h-28 w-28 rounded-lg border border-[#E8EEEB] bg-white p-1 shrink-0"
-                    />
-                    {twoFaInfo.manualKey && (
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-[11px] font-medium text-[#66736D]">Ou saisie manuelle (clé Base32) :</p>
-                        <p className="font-mono text-xs font-semibold text-[#123C32] break-all select-all">
-                          {twoFaInfo.manualKey}
-                        </p>
-                        <p className="text-[11px] text-[#66736D]">Type : Basé sur l’heure (TOTP, 30s)</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {twoFaInfo?.devPreviewCode && (
-                <div className="rounded-lg border border-[#D6AE55]/40 bg-[#FBF6E8] p-3 text-xs text-[#123C32]">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold">Code TOTP instantané (environnement de dev) :</p>
-                    <button
-                      type="button"
-                      onClick={refreshTwoFaStatus}
-                      className="text-[11px] font-medium text-[#185C46] hover:underline cursor-pointer"
-                    >
-                      Actualiser
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[#66736D]">
-                    Code actif :{' '}
-                    <button
-                      type="button"
-                      onClick={() => setTotpCode(twoFaInfo.devPreviewCode || '')}
-                      className="font-mono font-bold text-[#185C46] underline cursor-pointer"
-                    >
-                      {twoFaInfo.devPreviewCode}
-                    </button>{' '}
-                    (cliquez pour remplir)
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="rounded-lg border border-[#E8EEEB] px-4 py-2.5 text-xs font-medium text-[#66736D] hover:bg-[#F6F8F7] cursor-pointer"
-                >
-                  Déconnexion
-                </button>
-                <button
-                  type="submit"
-                  disabled={verifying2Fa || totpCode.length !== 6}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[#185C46] py-2.5 text-sm font-semibold text-white hover:bg-[#123C32] transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  <span>{verifying2Fa ? 'Validation...' : 'Déverrouiller la console'}</span>
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
+          </form>
         </div>
       </div>
     );
@@ -1334,14 +1261,168 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
                 ))}
               </div>
 
-              <div className="rounded-xl border border-[#E8EEEB] bg-white p-5">
+              {/* Gestion 2FA personnelle & Codes de récupération */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="rounded-xl border border-[#E8EEEB] bg-white p-5 space-y-4">
+                  <div>
+                    <h2 className="font-display text-sm font-semibold text-[#123C32]">
+                      Mon authentification 2FA & Codes de récupération
+                    </h2>
+                    <p className="mt-1 text-xs text-[#66736D]">
+                      Codes de récupération restants :{' '}
+                      <span className="font-mono font-bold text-[#123C32]">
+                        {securityData.twoFactorSummary?.remainingRecoveryCodes ?? 0} / 8
+                      </span>
+                      {securityData.twoFactorSummary?.lastVerifiedAt
+                        ? ` · Dernière vérification : ${securityData.twoFactorSummary.lastVerifiedAt}`
+                        : ''}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[#123C32] mb-1">
+                      Confirmer avec votre code TOTP actuel (6 chiffres)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={confirmTotpFor2faAction}
+                      onChange={(e) => setConfirmTotpFor2faAction(e.target.value.replace(/\D/g, ''))}
+                      placeholder="000000"
+                      className="w-44 rounded-lg border border-[#E8EEEB] px-3 py-2 text-center font-mono text-sm font-bold tracking-[0.25em]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={twoFaMgmtLoading || confirmTotpFor2faAction.length !== 6}
+                      onClick={handleRegenerateRecoveryCodes}
+                      className="rounded-lg bg-[#185C46] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#123C32] cursor-pointer disabled:opacity-50"
+                    >
+                      Régénérer 8 codes de récupération
+                    </button>
+                    <button
+                      type="button"
+                      disabled={twoFaMgmtLoading || confirmTotpFor2faAction.length !== 6}
+                      onClick={handleRotate2faKey}
+                      className="rounded-lg border border-[#D94B4B]/40 bg-white px-3.5 py-2 text-xs font-semibold text-[#D94B4B] hover:bg-[#FDECEC] cursor-pointer disabled:opacity-50"
+                    >
+                      Renouveler ma clé 2FA (nouveau QR)
+                    </button>
+                  </div>
+
+                  {regeneratedCodes && (
+                    <div className="rounded-lg border border-[#185C46]/30 bg-[#EDF5F1] p-3.5 space-y-2">
+                      <p className="text-xs font-semibold text-[#185C46]">
+                        Nouveaux codes à usage unique (enregistrez-les maintenant, ils ne seront plus affichés) :
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {regeneratedCodes.map((rc) => (
+                          <div
+                            key={rc}
+                            className="rounded border border-[#E8EEEB] bg-white px-2 py-1 text-center font-mono text-xs font-bold text-[#123C32] select-all"
+                          >
+                            {rc}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Enregistrer un nouveau développeur */}
+                <div className="rounded-xl border border-[#E8EEEB] bg-white p-5 space-y-3">
+                  <div>
+                    <h2 className="font-display text-sm font-semibold text-[#123C32]">
+                      Enregistrer un compte développeur
+                    </h2>
+                    <p className="mt-1 text-xs text-[#66736D]">
+                      Chaque compte reçoit automatiquement son propre secret TOTP chiffré et un QR code individuel.
+                    </p>
+                  </div>
+                  <form onSubmit={handleCreateDevAccount} className="space-y-2.5">
+                    <input
+                      type="text"
+                      required
+                      value={newDevForm.fullName}
+                      onChange={(e) => setNewDevForm({ ...newDevForm, fullName: e.target.value })}
+                      placeholder="Nom complet (ex. Konan Marc)"
+                      className="w-full rounded-lg border border-[#E8EEEB] px-3 py-2 text-xs"
+                    />
+                    <input
+                      type="email"
+                      required
+                      value={newDevForm.email}
+                      onChange={(e) => setNewDevForm({ ...newDevForm, email: e.target.value })}
+                      placeholder="dev2@immopay.ci"
+                      className="w-full rounded-lg border border-[#E8EEEB] px-3 py-2 text-xs"
+                    />
+                    <input
+                      type="password"
+                      required
+                      minLength={12}
+                      value={newDevForm.password}
+                      onChange={(e) => setNewDevForm({ ...newDevForm, password: e.target.value })}
+                      placeholder="Mot de passe fort (12+ caractères)"
+                      className="w-full rounded-lg border border-[#E8EEEB] px-3 py-2 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      disabled={creatingDev}
+                      className="w-full rounded-lg bg-[#123C32] py-2 text-xs font-semibold text-white hover:bg-[#185C46] cursor-pointer disabled:opacity-50"
+                    >
+                      {creatingDev ? 'Création...' : 'Créer le compte développeur'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Liste des comptes privilégiés & statut 2FA */}
+              {securityData.developerAccounts && (
+                <div className="rounded-xl border border-[#E8EEEB] bg-white p-5 overflow-x-auto">
+                  <h2 className="font-display text-sm font-semibold text-[#123C32] mb-3">
+                    Comptes privilégiés protégés par 2FA individuelle
+                  </h2>
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-[#E8EEEB] text-[#66736D]">
+                      <tr>
+                        <th className="py-2 font-medium">Nom</th>
+                        <th className="py-2 font-medium">E-mail</th>
+                        <th className="py-2 font-medium">Statut 2FA</th>
+                        <th className="py-2 font-medium">Codes récupération</th>
+                        <th className="py-2 font-medium">Dernière vérif.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E8EEEB]">
+                      {securityData.developerAccounts.map((acc: any) => (
+                        <tr key={acc.id}>
+                          <td className="py-2 font-medium text-[#123C32]">{acc.full_name}</td>
+                          <td className="py-2 font-mono text-[#66736D]">{acc.email}</td>
+                          <td className="py-2">
+                            <span className={`font-semibold ${acc.is_activated ? 'text-[#185C46]' : 'text-[#B87716]'}`}>
+                              {acc.is_activated ? 'Activée (TOTP chiffré)' : 'En attente scan QR'}
+                            </span>
+                          </td>
+                          <td className="py-2 font-mono text-[#123C32]">{acc.remaining_recovery_codes ?? 0}</td>
+                          <td className="py-2 font-mono text-[#66736D]">{acc.last_verified_at || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-[#E8EEEB] bg-white p-5 overflow-x-auto">
                 <h2 className="font-display text-sm font-semibold text-[#123C32] mb-3">
-                  Traçabilité des connexions récentes (données sensibles masquées)
+                  Traçabilité des connexions & événements 2FA récents (données sensibles masquées)
                 </h2>
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-[#E8EEEB] text-[#66736D]">
                     <tr>
                       <th className="py-2 font-medium">Date</th>
+                      <th className="py-2 font-medium">Événement</th>
                       <th className="py-2 font-medium">Rôle</th>
                       <th className="py-2 font-medium">IP</th>
                       <th className="py-2 font-medium">Détails</th>
@@ -1351,6 +1432,7 @@ export const DeveloperConsole: React.FC<DeveloperConsoleProps> = ({
                     {securityData.recentLogins.map((l: any) => (
                       <tr key={l.id}>
                         <td className="py-2 font-mono tabular-nums text-[#66736D]">{l.created_at}</td>
+                        <td className="py-2 font-mono font-semibold text-[#123C32]">{l.action}</td>
                         <td className="py-2 font-mono text-[#123C32]">{l.role_type || 'N/A'}</td>
                         <td className="py-2 font-mono text-[#66736D]">{l.ip_address || '-'}</td>
                         <td className="py-2 font-mono text-[11px] text-[#66736D] truncate max-w-md">{l.details_json}</td>

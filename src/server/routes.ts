@@ -167,16 +167,17 @@ apiRouter.post('/auth/login', (req, res) => {
   }
 
   clearLoginRateLimit(ip);
+  const requires2Fa = user.role_type === 'developer' || user.role_type === 'super_admin';
   const token = signSessionToken({
     userId: user.id,
     roleType: user.role_type,
-    twoFactorVerified: user.role_type !== 'developer',
+    twoFactorVerified: !requires2Fa,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
   });
   setSessionCookie(res, token);
 
-  const payload = buildAuthPayload(user.id, user.role_type !== 'developer');
-  logActivity(null, user.id, 'USER_LOGIN', 'user', user.id, { email: user.email, roleType: user.role_type }, ip);
+  const payload = buildAuthPayload(user.id, !requires2Fa);
+  logActivity(null, user.id, 'USER_LOGIN', 'user', user.id, { email: user.email, roleType: user.role_type, requires2Fa }, ip);
   res.json(payload);
 });
 

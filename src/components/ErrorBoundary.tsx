@@ -38,9 +38,17 @@ export function installGlobalClientErrorTelemetry(): void {
 
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
+    const message = reason instanceof Error ? reason.message : String(reason || 'Promesse rejetée non gérée');
+    const stack = reason instanceof Error ? reason.stack : undefined;
+    if (
+      message.includes('WebSocket closed without opened') ||
+      (stack && stack.includes('/@vite/client'))
+    ) {
+      return;
+    }
     reportClientError({
-      message: reason instanceof Error ? reason.message : String(reason || 'Promesse rejetée non gérée'),
-      stack: reason instanceof Error ? reason.stack : undefined,
+      message,
+      stack,
     });
   });
 }

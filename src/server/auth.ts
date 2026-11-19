@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { db } from './db';
+import { scrub2faMasterSecretFromText } from './twoFactor';
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'immopay-ci-dev-session-secret-change-in-prod';
 export const SESSION_COOKIE_NAME = 'immopay_session';
@@ -54,70 +55,21 @@ export function verifySessionToken(token: string): SessionPayload | null {
 }
 
 // ---------------------------------------------------------------------------
-// RFC 6238 TOTP (HMAC-SHA1, 30s step, 6 digits) for Developer 2FA
-// ---------------------------------------------------------------------------
-
-const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-
-function decodeBase32(base32: string): Buffer {
-  const clean = base32.toUpperCase().replace(/[^A-Z2-7]/g, '');
-  let bits = 0;
-  let value = 0;
-  const output: number[] = [];
-  for (let i = 0; i < clean.length; i++) {
-    const idx = BASE32_ALPHABET.indexOf(clean[i]);
-    if (idx === -1) continue;
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) {
-      output.push((value >>> (bits - 8)) & 0xff);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(output);
-}
-
-export function generateTotpCode(secretBase32: string, stepOffset = 0): string {
-  const key = decodeBase32(secretBase32);
-  const counter = Math.floor(Date.now() / 1000 / 30) + stepOffset;
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64BE(BigInt(counter));
-  const hmac = crypto.createHmac('sha1', key).update(buf).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const code =
-    ((hmac[offset] & 0x7f) << 24) |
-    ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) |
-    (hmac[offset + 3] & 0xff);
-  return String(code % 1_000_000).padStart(6, '0');
-}
-
-export function verifyTotpCode(secretBase32: string, candidate: string): boolean {
-  const trimmed = String(candidate || '').replace(/\s+/g, '');
-  if (!/^\d{6}$/.test(trimmed)) return false;
-  for (const offset of [-1, 0, 1]) {
-    const expected = generateTotpCode(secretBase32, offset);
-    if (crypto.timingSafeEqual(Buffer.from(trimmed), Buffer.from(expected))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // Sensitive Data Redaction
 // ---------------------------------------------------------------------------
 
 const SENSITIVE_KEY_PATTERN =
-  /(pass(word|phrase)?|secret|token|cookie|authorization|api[_-]?key|signature|otp|totp|private[_-]?key|cvv|iban|card[_-]?number|session|hash)/i;
+  /(pass(word|phrase)?|secret|token|cookie|authorization|api[_-]?key|signature|otpauth|otp|totp|recovery[_-]?code|backup[_-]?code|manual[_-]?key|qr[_-]?data|private[_-]?key|cvv|iban|card[_-]?number|session|hash)/i;
 
 export function redactSensitive(value: unknown, depth = 0): unknown {
   if (depth > 6) return '[PROFONDEUR_MAX]';
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') {
-    return value
+    const scrubbed = scrub2faMasterSecretFromText(value);
+    return scrubbed
       .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer ***MASQUÉ***')
-      .replace(/immopay_session=[^;\s]+/gi, 'immopay_session=***MASQUÉ***');
+      .replace(/immopay_session=[^;\s]+/gi, 'immopay_session=***MASQUÉ***')
+      .replace(/otpauth:\/\/totp\/[^\s"']+/gi, 'otpauth://totp/***MASQUÉ***');
   }
   if (Array.isArray(value)) {
     return value.slice(0, 50).map((item) => redactSensitive(item, depth + 1));
@@ -276,6 +228,13 @@ export function requirePermission(perm: string) {
 export function requireSuperAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   if (!req.authUser || req.authUser.role_type !== 'super_admin') {
     res.status(403).json({ error: 'Accès strictement réservé à la direction IMMOPAY CI.' });
+    return;
+  }
+  if (!req.twoFactorVerified) {
+    res.status(403).json({
+      error: 'Authentification à deux facteurs (2FA) requise pour accéder à l’administration IMMOPAY CI.',
+      requires2FA: true,
+    });
     return;
   }
   next();

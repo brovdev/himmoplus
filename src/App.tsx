@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { TwoFactorGate } from './components/TwoFactorGate';
 import { apiFetch } from './lib/api';
 import { AdminLayout } from './pages/AdminLayout';
 import { AuthPages } from './pages/AuthPages';
@@ -160,7 +161,18 @@ export default function App() {
       )}
 
       {auth && auth.user.role_type === 'super_admin' && route !== 'public' && (
-        <SuperAdminConsole onLogout={handleLogout} />
+        auth.twoFactorVerified ? (
+          <SuperAdminConsole onLogout={handleLogout} />
+        ) : (
+          <TwoFactorGate
+            title="Vérification 2FA Super Administrateur"
+            subtitle="Console Direction IMMOPAY CI · Accès protégé"
+            userEmail={auth.user.email}
+            onVerified={hydrateAuth}
+            onLogout={handleLogout}
+            onExitToPublic={() => handleNavigate('public')}
+          />
+        )
       )}
 
       {auth &&
